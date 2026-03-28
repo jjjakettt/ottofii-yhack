@@ -132,40 +132,134 @@ Keep it deterministic. Fast, testable, inspectable. See ARCHITECTURE.md for rati
 
 ## Person 4 — Execution / Policy
 
-**Stack**: Python (FastAPI), Playwright (Python or Node), a tiny Express/Next app for demo portal
+**Stack**: Python (FastAPI), Playwright (Python), Next.js pages for demo portal (inside `frontend/`)
 
-### Task List
+### How It All Connects
 
-- [ ] Demo portal (build this first — Person 3's Playwright scripts depend on it):
-  - Simple web app (can be Next.js pages or plain HTML + Express)
-  - Routes: `/demo/login`, `/demo/subscriptions`, `/demo/confirm-cancel`, `/demo/receipt`
-  - Subscriptions page: list of 3–4 fake tools with "Cancel" buttons
-  - Receipt page: generate a random `confirmation_id` and display it
-- [ ] Policy engine (`policy.py`):
-  - Check `is_protected` flag on stream
-  - Check category blocklist: `['payroll', 'rent', 'mortgage', 'insurance', 'utility', 'tax']`
-  - Reject if action violates policy (return 403 with reason)
-- [ ] `POST /agent/execute` endpoint:
-  - Fetch `action` row, validate status = `APPROVED`
-  - Run policy check
-  - Update status → `EXECUTING`
-  - Dispatch to executor based on `channel` in `tool_args`:
-    - `browser` → `playwright_executor(runbook_id, args)`
-    - `email` → `email_stub(template_id, args)` (just logs for hackathon)
-  - On success: update status → `SUCCEEDED`, store evidence
-  - On failure: update status → `FAILED`, notify
-- [ ] Playwright executor (`executors/browser_cancel.py`):
-  - Targets local demo portal
-  - Login → navigate to subscriptions → click cancel → confirm → capture receipt
-  - Returns `{ confirmation_id, screenshot_path }`
-- [ ] Evidence storage: write to `action_evidence` table
-- [ ] `GET /actions/{id}` endpoint — returns action + evidence[]
-- [ ] `GET /savings/summary` endpoint — sums verified savings
+```
+User approves in frontend UI
+        │
+        ▼
+POST /agent/execute   ← your endpoint
+        │
+        ├─ policy check (is_protected? blocked category?)
+        │
+        ├─ Playwright opens a real browser
+        │   navigates to YOUR demo portal (localhost:3000/demo/...)
+        │   logs in → finds subscription → clicks cancel → reads receipt
+        │
+        ├─ stores confirmation_id + screenshot as evidence
+        │
+        └─ updates action status → SUCCEEDED
+                │
+                ▼
+GET /actions/{id}  ← Person 1 polls this, shows proof in UI
+```
+
+Playwright needs a **real website** to click through — it cannot automate an in-memory object.
+Instead of navigating real vendor sites (CAPTCHAs, 2FA, ToS), you build a tiny fake portal
+with the same UX shape and Playwright automates that instead. Same code, same proof, zero friction.
+
+### Part A — Demo Portal  ✅ DONE
+Live at `frontend/src/app/demo/` — 4 Next.js pages already created:
+
+| Route | Purpose | Key Playwright selectors |
+|-------|---------|--------------------------|
+| `/demo/login` | Email + password form | `input[name="email"]`, `button[type="submit"]` |
+| `/demo/subscriptions` | List of fake tools with Cancel buttons | `button[data-subscription-id="X"][data-action="cancel"]` |
+| `/demo/confirm-cancel?id=X&merchant=Y&amount=Z` | Confirm step | `button[data-action="confirm"]` |
+| `/demo/receipt?id=X&merchant=Y` | Shows confirmation ID | `[data-field="confirmation_id"]` |
+
+Any credentials work on the login page (it's fake). Subscriptions list matches the seed data merchants.
+
+### Part B — Playwright Executor
+
+File: `backend/executors/browser_cancel.py`
+
+- [ ] Create `backend/executors/` folder + `__init__.py`
+- [ ] Write `browser_cancel(merchant: str, subscription_id: str) -> dict` async function:
+  - Launch headless Chromium via Playwright
+  - Navigate to `{DEMO_PORTAL_URL}/demo/login`
+  - Fill email + password → submit
+  - Navigate to `/demo/subscriptions`
+  - Click `button[data-subscription-id="{subscription_id}"][data-action="cancel"]`
+  - Wait for redirect to `/demo/confirm-cancel`
+  - Click `button[data-action="confirm"]`
+  - Wait for redirect to `/demo/receipt`
+  - Read `[data-field="confirmation_id"]` text content
+  - Take screenshot → save to `backend/evidence/{action_id}.png`
+  - Return `{ "confirmation_id": "...", "screenshot_path": "..." }`
+- [ ] Test standalone: `python -m executors.browser_cancel` before wiring to endpoint
+
+### Part C — Policy Engine
+
+File: `backend/policy.py`
+
+- [ ] Write `check_policy(stream, action_type) -> dict` function:
+  ```python
+  BLOCKED_CATEGORIES = ['payroll', 'rent', 'mortgage', 'insurance', 'utility', 'tax']
+
+  def check_policy(stream, action_type):
+      if stream.is_protected:
+          return { "allowed": False, "reason": "Stream is marked protected" }
+      if stream.category in BLOCKED_CATEGORIES:
+          return { "allowed": False, "reason": f"Category '{stream.category}' is never auto-acted on" }
+      return { "allowed": True, "reason": None }
+  ```
+
+### Part D — Backend Endpoints
+
+File: `backend/routers/actions.py`
+
+- [ ] `POST /agent/execute`
+  - Fetch `action` row by `action_id`, validate `status == "approved"`
+  - Fetch linked `recommendation` → fetch linked `recurring_stream`
+  - Run `check_policy(stream, action.tool_name)`
+  - If blocked: update status → `"failed"`, return 403 with reason
+  - Update status → `"executing"`
+  - Dispatch based on channel in `tool_args`:
+    - `"browser"` → call `browser_cancel(merchant, subscription_id)`
+    - `"email"` → log stub (print to console, status → `"succeeded"`)
+  - On success: update status → `"succeeded"`, set `executed_at`
+  - Write two `action_evidence` rows: `confirmation_id` + `screenshot`
+  - Write `audit_events` row
+  - Return `{ "action_id": ..., "status": "succeeded" }`
+
+- [ ] `GET /actions/{action_id}`
+  - Fetch `action` row + all linked `action_evidence` rows
+  - Return `ActionDetail` schema (see TEAM.md)
+  - Person 1 polls this every 2 seconds to show live status
+
+- [ ] `GET /savings/summary`
+  - Query: sum `recommendations.savings_usd` where linked `action.status == "succeeded"`
+  - Query: sum where `action.status in ("approved", "executing")` → pending
+  - Return `SavingsSummary` schema (see TEAM.md)
+
+- [ ] Register router in `main.py`:
+  ```python
+  from routers import actions
+  app.include_router(actions.router)
+  ```
 
 ### Key Contracts
 
-- **Depends on**: `actions` table (Person 3 writes APPROVED row)
-- **Produces for Person 1**: `GET /actions/{id}` response with status + evidence
+- **Depends on**: `actions` table written by Person 3 (status = `"approved"`)
+- **Depends on**: Demo portal running at `DEMO_PORTAL_URL` (Part A — already done)
+- **Produces for Person 1**: `GET /actions/{id}` with status + evidence
+- **Produces for Person 1**: `GET /savings/summary` with verified/pending totals
+
+### Execution Order
+
+```
+1. Test demo portal works in browser (localhost:3000/demo/login)
+2. Write + test browser_cancel.py standalone against demo portal
+3. Write policy.py
+4. Wire POST /agent/execute using browser_cancel + policy
+5. Wire GET /actions/{id}
+6. Wire GET /savings/summary
+7. Add router to main.py
+8. Integration test: full loop with Person 1 and Person 3
+```
 
 ---
 
