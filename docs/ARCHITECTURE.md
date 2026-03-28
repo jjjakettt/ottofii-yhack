@@ -1,200 +1,178 @@
 # System Architecture
 
-## High-Level Data Flow
+## The Core Loop (Single User Flow)
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   DATA SOURCES                       │
-│  ERP · AP Tools · Corporate Cards · SaaS · Cloud    │
-│          [Hackathon: mock CSV / seeded DB]           │
-└────────────────────────┬────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│                  INGESTION LAYER                     │
-│  Connector per source → normalize → emit events     │
-│  Webhook support for push updates                   │
-│          [Hackathon: seed script + REST upload]     │
-└────────────────────────┬────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│           NORMALIZATION + SPEND GRAPH               │
-│                                                     │
-│  Nodes: vendors, subscriptions, teams, users        │
-│  Edges: payments, usage, ownership, overlap         │
-│                                                     │
-│  recurring_streams table (canonical object)         │
-│  Merchant deduplication · Cadence detection         │
-│  Confidence scoring                                 │
-└────────────────────────┬────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│              INTELLIGENCE LAYER                     │
-│                                                     │
-│  ┌──────────────┐  ┌──────────────┐                │
-│  │ Rule Engine  │  │ LLM Reasoning│                │
-│  │ - Cadence    │  │ - Extraction │                │
-│  │ - Variance   │  │ - Ranking    │                │
-│  │ - Overlap    │  │ - Explanation│                │
-│  └──────┬───────┘  └──────┬───────┘                │
-│         └────────┬─────────┘                       │
-│                  ▼                                  │
-│           Decision Engine                           │
-│       Savings Score × Confidence                    │
-│       Regret Risk · Compliance Risk                 │
-│       → Ranked ActionPlan (JSON)                    │
-└────────────────────────┬────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│            HUMAN-IN-THE-LOOP UI                     │
-│                                                     │
-│  Dashboard · Stream List · Recommendation Cards     │
-│  Confirmation Modal · Audit Log · Savings Tracker   │
-└────────────────────────┬────────────────────────────┘
-                         │ (user approves)
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│               POLICY ENGINE                         │
-│                                                     │
-│  Allowlists · Thresholds · Role-based gates         │
-│  Never-touch categories (rent/insurance/payroll)    │
-│  Enterprise: approval routing by action class       │
-└────────────────────────┬────────────────────────────┘
-                         │ (policy passes)
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│               ACTION ENGINE                         │
-│                                                     │
-│  ┌──────────┐ ┌──────────┐ ┌─────────┐ ┌────────┐ │
-│  │ Vendor   │ │  Email   │ │Browser  │ │ Phone  │ │
-│  │   API    │ │Automation│ │(Playwright│ │(Voice) │ │
-│  └──────────┘ └──────────┘ └─────────┘ └────────┘ │
-│                                                     │
-│  Idempotency keys · Retry logic · Circuit breakers  │
-│  State: PROPOSED→APPROVED→EXECUTING→SUCCEEDED       │
-└────────────────────────┬────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│           VERIFICATION + MONITORING                 │
-│                                                     │
-│  Vendor confirmation · Email parsing                │
-│  Financial re-check (no future charge)              │
-│  Screenshot evidence · Confirmation ID              │
-└────────────────────────┬────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────┐
-│               AUDIT LOG                             │
-│  Immutable · Actor + timestamp + payload            │
-│  Every action, approval, and verification logged    │
-└─────────────────────────────────────────────────────┘
+User connects sources
+        │
+        ▼
+┌───────────────────────────────────────────────────────────────┐
+│  LAYER 1 — INGESTION + DETECTION          [ Person 2 owns ]  │
+│                                                               │
+│  Mock connectors:                                             │
+│    Bank/Cards → transaction records                           │
+│    Gmail      → email receipt/renewal records                 │
+│    Slack      → SaaS app install + activity signals           │
+│    CSV Upload → raw transaction rows                          │
+│                                                               │
+│  Normalization:                                               │
+│    Deduplicate merchants · Detect cadence · Score confidence  │
+│                                                               │
+│  Output: recurring_streams table (canonical spend objects)    │
+│  Endpoint: GET /recurring-streams                             │
+└───────────────────────────────┬───────────────────────────────┘
+                                │ recurring_streams[]
+                                ▼
+┌───────────────────────────────────────────────────────────────┐
+│  LAYER 2 — INTELLIGENCE (LLM AGENT)       [ Person 3 owns ]  │
+│                                                               │
+│  Input:  recurring_streams[] from Layer 1                     │
+│  Model:  Claude claude-sonnet-4-6 with structured outputs             │
+│                                                               │
+│  Steps:                                                       │
+│    1. Score each stream (savings × confidence × regret risk)  │
+│    2. Apply blocklist (rent/insurance/payroll → skip)         │
+│    3. Generate explanation + evidence per action              │
+│    4. Return ranked ActionPlan JSON (schema-constrained)      │
+│                                                               │
+│  Output: ActionPlan JSON → stored in action_plans table       │
+│  Endpoints: POST /agent/plan                                  │
+│             POST /agent/confirm                               │
+└───────────────────────────────┬───────────────────────────────┘
+                                │ ActionPlan JSON
+                                ▼
+┌───────────────────────────────────────────────────────────────┐
+│  LAYER 3 — FRONTEND + APPROVAL UI         [ Person 1 owns ]  │
+│                                                               │
+│  Pages:                                                       │
+│    / (landing)      → connector selection or demo mode        │
+│    /dashboard       → savings summary + stream list           │
+│    /recommendations → ranked action cards with evidence       │
+│    /actions/{id}    → execution status + proof                │
+│                                                               │
+│  User actions:                                                │
+│    Connect source → POST /connect/mock                        │
+│    View plan      → GET  /agent/plan (cached)                 │
+│    Approve action → POST /agent/confirm                       │
+│    Watch status   → GET  /actions/{id} (poll or SSE)         │
+└───────────────────────────────┬───────────────────────────────┘
+                                │ user approves action
+                                ▼
+┌───────────────────────────────────────────────────────────────┐
+│  LAYER 4 — POLICY + EXECUTION + VERIFY    [ Person 4 owns ]  │
+│                                                               │
+│  Policy check (before execution):                             │
+│    Blocklist categories · is_protected flag · thresholds      │
+│                                                               │
+│  Execution channels (hackathon):                              │
+│    Browser (Playwright) → against our own demo portal         │
+│    Email stub            → log email that would be sent       │
+│                                                               │
+│  Demo portal (Person 4 builds):                               │
+│    /demo/login · /demo/subscriptions                          │
+│    /demo/confirm-cancel · /demo/receipt                       │
+│                                                               │
+│  State machine: APPROVED → EXECUTING → SUCCEEDED/FAILED       │
+│  Evidence stored: confirmation_id, screenshot                 │
+│                                                               │
+│  Endpoints: POST /agent/execute                               │
+│             GET  /actions/{id}                                │
+│             GET  /savings/summary                             │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Component Responsibilities
+## Detection: Rules, Not an Agent
 
-### Ingestion Layer
-- One connector per data source
-- Emits normalized `Transaction` events into pipeline
-- Cursor-based sync for incremental updates (no re-processing)
-- **Hackathon**: seed script writes directly to `recurring_streams` table
+Detection (Layer 1) is **deterministic**, not LLM-powered. This is intentional:
 
-### Spend Graph / Normalization
-- Merchant name deduplication (fuzzy match + LLM normalization)
-- Cadence detection: group by merchant → detect periodic pattern
-- Confidence scoring: occurrences, amount variance, cadence regularity
-- The spend graph is the defensibility layer — richer than raw transactions
+| | Rule-based Detection | LLM Agent Detection |
+|--|---------------------|---------------------|
+| Speed | Fast (ms) | Slow (seconds) |
+| Reliability | Predictable | Non-deterministic |
+| Debuggability | Easy to inspect | Hard to audit |
+| Hackathon risk | Low | High |
 
-### Intelligence Layer
+The LLM's job is **planning and explanation** — it reads the already-structured output from Layer 1 and decides what to do about it. This separation makes each layer independently testable and the demo more reliable.
 
-**Rule Engine (fast, interpretable)**
-- Group transactions by normalized merchant name
-- Flag periodic patterns (monthly/annual, low variance)
-- Detect zero-usage signals (no logins, 0 API calls)
-- Detect vendor overlaps (two tools with same category + features)
-- Blocklist: rent, mortgage, insurance, payroll, taxes, utilities
-
-**LLM Reasoning (Claude claude-sonnet-4-6)**
-- Input: recurring streams (merchant, amount, cadence, usage signals, emails)
-- Output: structured `ActionPlan` JSON (schema-constrained)
-- Role: enrich explanations, handle ambiguous descriptors, rank by savings
-- Prompt enforces: negative constraints, confirmation rules, JSON schema
-
-**Decision Engine**
-- Composite score: `savings_score × confidence × (1 - regret_risk) × feasibility`
-- Three thresholds:
-  - **Auto-act**: low risk, reversible, below policy threshold
-  - **Recommend + confirm**: most actions (default safe mode)
-  - **Do not touch**: rent, mortgage, regulated fees, production tools
-
-### Action Engine
-Four execution channels (ranked by reliability):
-
-| Channel | Reliability | Use For |
-|---------|------------|---------|
-| Vendor API | High | SaaS with admin APIs |
-| Email | Medium | Cancellation requests, paper trail |
-| Browser (Playwright) | Medium | Consumer portals, long-tail vendors |
-| Phone/IVR | Low-Medium | Negotiation, vendors without portals |
-
-Each action has:
-- `idempotency_key` — prevents duplicate execution
-- State machine — `PROPOSED → APPROVED → EXECUTING → SUCCEEDED/FAILED → VERIFIED`
-- Evidence stored — screenshot, confirmation ID, email body
-
-### Policy Engine
-- Validates action against org policy before execution
-- Role-based: CFO sees all, IT can veto technical tools, AP executes
-- Category blocklist enforced server-side (not just in prompts)
-
-### Verification Layer
-- Vendor confirmation: screenshot/HTML from portal
-- Email confirmation: mailbox watcher parses confirmation emails
-- Financial confirmation: check for absence of future charge (webhook trigger)
+Detection rules:
+1. Group transactions by normalized merchant name
+2. Flag if: 2+ occurrences, amount variance < 10%, periodic cadence (monthly/annual)
+3. Pull zero-usage signals from Slack connector data
+4. Detect category overlaps (two tools tagged `project-management`, `video-conferencing`, etc.)
+5. Blocklist: payroll, rent, mortgage, insurance, utilities, taxes → confidence = 0, never surfaced
 
 ---
 
-## API Surface (Hackathon Endpoints)
+## API Surface (Full Map)
 
 ```
-POST /connect/upload           → ingest CSV / mock transactions
-GET  /recurring-streams        → list detected recurring streams
-POST /agent/plan               → LLM generates ActionPlan JSON
-POST /agent/confirm            → record user approval
-POST /agent/execute            → trigger execution worker
-GET  /actions/{id}             → status + evidence
-GET  /savings/summary          → verified + pending savings totals
-POST /webhooks/transactions    → (future) receive transaction updates
+Ingestion (Layer 1 / Person 2)
+  POST /connect/mock          body: { source: 'bank'|'gmail'|'slack'|'csv', file? }
+  GET  /recurring-streams     returns: RecurringStream[]
+
+Intelligence (Layer 2 / Person 3)
+  POST /agent/plan            body: { user_goal? }  → returns: ActionPlan
+  POST /agent/confirm         body: { recommendation_id, approved_by }  → returns: { action_id }
+
+Frontend calls these (Person 1 consumes all of the above)
+
+Execution (Layer 4 / Person 4)
+  POST /agent/execute         body: { action_id }  → returns: { status }
+  GET  /actions/{id}          returns: Action + ActionEvidence[]
+  GET  /savings/summary       returns: { verified_usd, pending_usd, action_count }
 ```
+
+All request/response shapes are defined in [TEAM.md](TEAM.md).
+
+---
+
+## Data Flow (Simplified)
+
+```
+[Mock connector data]
+        │
+        │  seed / POST /connect/mock
+        ▼
+[recurring_streams table]          ← Person 2 writes, Person 3 reads
+        │
+        │  POST /agent/plan
+        ▼
+[action_plans + recommendations]   ← Person 3 writes, Person 1 reads
+        │
+        │  POST /agent/confirm (user approves in UI)
+        ▼
+[actions table — status: APPROVED] ← Person 3 writes, Person 4 reads
+        │
+        │  POST /agent/execute
+        ▼
+[actions table — status: SUCCEEDED]← Person 4 writes, Person 1 reads
+[action_evidence table]
+```
+
+---
+
+## Tech Stack
+
+| Concern | Choice | Notes |
+|---------|--------|-------|
+| Frontend | Next.js 14 (App Router) + Tailwind | Person 1 |
+| Backend | FastAPI (Python) | Shared — one repo |
+| Database | SQLite (hackathon) → Postgres | Schema in DATA_MODEL.md |
+| LLM | Claude claude-sonnet-4-6 via Anthropic SDK | Structured output mode |
+| Automation | Playwright (Python or Node) | Against local demo portal |
+| Job queue | Inline async (FastAPI BackgroundTasks) | No Redis needed for MVP |
 
 ---
 
 ## Operating Modes
 
-### Safe Mode (default)
+**Safe Mode (only mode for hackathon)**
 ```
-Detect → Propose → Explain → User Confirms → Execute → Verify
+Detect → Plan → Show in UI → User confirms → Execute → Verify
 ```
-Every action requires explicit approval. Full audit trail.
+Every action requires explicit user approval. No auto-execution.
 
-### Autonomous Mode (enterprise premium)
-```
-Detect → Policy Check → Auto-Execute (within thresholds) → Verify → Notify
-```
-Example policy: "Auto-cancel unused tools under $2,000/year"
-Requires: approval gates, audit log, kill switch per vendor
-
----
-
-## Scalability Design Principles
-
-1. **Connector abstraction** — each data source is a pluggable connector; adding a new source = implement interface, register connector
-2. **Tool schema versioning** — action tools are versioned JSON schemas; adding new action type = add schema + executor
-3. **Spend graph** — normalized data model means intelligence layer doesn't care about source format
-4. **Idempotency** — every action has a stable key; retries are safe
-5. **State machine** — every action transitions through explicit states; resumable, auditable, inspectable
+**Autonomous Mode (post-hackathon)**
+Policy-scoped auto-execution within thresholds. Approval gates for edge cases.

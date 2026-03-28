@@ -1,147 +1,223 @@
-# Hackathon Execution Plan — 24 Hours
+# Hackathon Execution Plan — 24 Hours / 4 People
 
-## Goal
-
-Demonstrate the full loop end-to-end:
+## The Demo We're Building
 
 ```
-[Mock Data / Upload] → [Detect Recurring Spend] → [LLM Action Plan (JSON)]
-     → [User Approves] → [Execute (Playwright demo)] → [Verify + Show Savings]
+Connect (mock) → Detect → AI Plan → User Approves → Execute → Verified Savings
 ```
 
-This is a **vertical slice**, not a full system. Depth > breadth.
+One linear flow, one user, four connectors (Bank, Gmail, Slack, CSV). See [USER_FLOWS.md](USER_FLOWS.md).
 
 ---
 
-## What We Are NOT Building (cut ruthlessly)
+## Team Split
 
-- Real bank/Plaid integration (mock it)
-- Real vendor API cancellation (Playwright against our own demo portal)
-- Email connector (stub it)
-- Auth system (hardcode a user or use a simple session)
-- Mobile UI
+| Person | Domain | Owns |
+|--------|--------|------|
+| **Person 1** | Frontend | Next.js UI, all pages, API consumption |
+| **Person 2** | Data / Detection | DB schema, seed data, connectors, normalization, detection rules |
+| **Person 3** | Intelligence / Agent | LLM prompt, ActionPlan generation, scoring, `/agent/plan`, `/agent/confirm` |
+| **Person 4** | Execution / Policy | Demo portal, Playwright executor, policy engine, `/agent/execute`, `/actions/{id}` |
 
----
-
-## Phase Breakdown
-
-### Phase 1 — Foundation (Hours 0–4)
-
-**Goal: skeleton running, data seeded, endpoints wired**
-
-- [ ] Repo structure: `frontend/`, `backend/`, `scripts/`
-- [ ] DB schema created (see [DATA_MODEL.md](DATA_MODEL.md))
-- [ ] Seed script: 10–15 mock recurring streams with varied categories, amounts, confidence
-- [ ] `GET /recurring-streams` returns seeded data
-- [ ] Frontend: basic list view renders streams
-- [ ] `POST /agent/plan` calls LLM and returns `ActionPlan` JSON (hardcoded input for now)
-
-**Owner suggestions**: 1 person on DB+seed, 1 person on backend skeleton, 1 person on frontend scaffold
+**Interface contracts between people are defined in [TEAM.md](TEAM.md). Read it before writing code.**
 
 ---
 
-### Phase 2 — Intelligence Layer (Hours 4–10)
+## Person 1 — Frontend
 
-**Goal: LLM reads spend data and produces structured, ranked action plan**
+**Stack**: Next.js 14 (App Router) + Tailwind CSS
 
-- [ ] Detection logic: rule-based grouping by merchant + cadence + amount variance
-- [ ] LLM prompt: feed recurring streams, get back `ActionPlan` with scored recommendations
-- [ ] Structured output enforced via JSON Schema (no free-form parsing)
-- [ ] Scoring: savings score × confidence × regret risk
-- [ ] Policy guardrails in prompt: never touch rent/insurance/payroll/utilities
-- [ ] `POST /agent/plan` fully wired: reads from DB, calls LLM, returns plan
+### Pages to Build
 
-**Key output**: `ActionPlan` JSON with `actions[]` each having:
-```json
-{
-  "stream_id": "...",
-  "merchant": "Notion",
-  "action_type": "cancel",
-  "monthly_savings": 320,
-  "confidence": 0.87,
-  "regret_risk": "low",
-  "explanation": "0 logins in 90 days across 16 seats. Duplicate of Confluence.",
-  "strategy": { "channel": "api", "runbook_id": "notion_cancel_v1" },
-  "idempotency_key": "cancel_notion_acme_2024_03"
-}
-```
+| Route | Purpose |
+|-------|---------|
+| `/` | Landing — connector selection + "Use demo data" button |
+| `/dashboard` | Savings summary + stream list |
+| `/recommendations` | Ranked action cards with evidence + approve/reject |
+| `/actions/[id]` | Execution status + proof (screenshot / confirmation ID) |
 
-See [ACTION_ENGINE.md](ACTION_ENGINE.md) for full schema.
+### Task List
 
----
+- [ ] Project scaffold: `npx create-next-app` with Tailwind
+- [ ] Layout + nav shell
+- [ ] `/` — connector cards (Bank, Gmail, Slack, CSV) + demo mode button
+  - Clicking "Connect" → fake OAuth screen → success → redirect to dashboard
+  - "Use demo data" → POST /connect/mock with `source: 'demo'` → redirect to dashboard
+- [ ] `/dashboard` — fetch `GET /recurring-streams`, show total spend, stream count
+- [ ] `/recommendations` — fetch `POST /agent/plan` (or cached), render ActionPlan cards
+  - Each card: merchant, amount, explanation, confidence badge, regret risk badge
+  - Approve button → `POST /agent/confirm` → redirect to `/actions/{id}`
+  - Dismiss button → mark rejected locally
+- [ ] `/actions/[id]` — poll `GET /actions/{id}`, show live status + evidence
+- [ ] Savings tracker widget (reusable): fetch `GET /savings/summary`
+- [ ] Sandbox mode: skip connector step, load demo data directly
 
-### Phase 3 — Action Execution (Hours 10–16)
+### Key Contracts to Consume
 
-**Goal: user approves an action, system executes it, shows proof**
-
-- [ ] `POST /agent/confirm` records approval + writes `action` row with status `APPROVED`
-- [ ] `POST /agent/execute` triggers execution worker
-- [ ] Playwright script against our demo portal (see [ACTION_ENGINE.md](ACTION_ENGINE.md))
-- [ ] Demo portal pages: `/login`, `/subscriptions`, `/confirm-cancel`, `/receipt`
-- [ ] Execution updates action status: `EXECUTING → SUCCEEDED`
-- [ ] Evidence stored: confirmation ID, screenshot path
-- [ ] `GET /actions/{id}` returns status + evidence
+See [TEAM.md](TEAM.md) for exact response shapes for each endpoint.
 
 ---
 
-### Phase 4 — UI Polish + Savings Tracker (Hours 16–22)
+## Person 2 — Data / Detection
 
-**Goal: judges can follow the whole story in the UI**
+**Stack**: Python, SQLite (via SQLAlchemy or raw sqlite3), seed scripts
 
-- [ ] Dashboard: "We found $X/month in recoverable spend"
-- [ ] Stream list with confidence badge + category tag
-- [ ] Action recommendation cards with explanation
-- [ ] Confirmation modal before execution
-- [ ] Live status: `Executing… → Succeeded` + proof display
-- [ ] Savings tracker: verified vs pending
-- [ ] Sandbox mode toggle (no auth required, uses seeded data)
+### Task List
 
----
+- [ ] DB schema: create all tables from [DATA_MODEL.md](DATA_MODEL.md)
+  - `users`, `connections`, `recurring_streams`, `recommendations`, `actions`, `action_evidence`, `audit_events`
+- [ ] Migration script (or just `init_db.py` for hackathon)
+- [ ] Seed script: 12 realistic recurring streams (see seed table in DATA_MODEL.md)
+  - Vary: categories, cadence, usage signals, confidence, overlap scenarios
+  - Include 1–2 protected/blocked streams (Slack at confidence 0.10)
+- [ ] Mock connector endpoints: `POST /connect/mock`
+  - `source: 'bank'` → load bank transaction seed
+  - `source: 'gmail'` → load email receipt seed
+  - `source: 'slack'` → load SaaS install/usage seed
+  - `source: 'csv'` → accept file upload, parse into transactions
+  - `source: 'demo'` → load full combined seed (all sources)
+- [ ] Detection service (`detection.py`):
+  - Group raw transactions by normalized merchant name
+  - Detect cadence: monthly / annual / quarterly (≥ 2 occurrences, amount variance < 10%)
+  - Pull usage signal from Slack connector records
+  - Detect category overlaps (two `saas` tools with same tag)
+  - Confidence score: function of occurrence count, variance, usage signal
+  - Write detected streams to `recurring_streams` table
+- [ ] `GET /recurring-streams` endpoint — returns `RecurringStream[]`
 
-### Phase 5 — Demo Prep + Buffer (Hours 22–24)
+### Detection is Rules, Not LLM
 
-- [ ] End-to-end demo rehearsal
-- [ ] Seed reset script (`python seed.py --reset`)
-- [ ] README with demo instructions
-- [ ] Slides: 1 slide per core concept (problem → architecture → demo → roadmap)
+Keep it deterministic. Fast, testable, inspectable. See ARCHITECTURE.md for rationale.
 
----
+### Key Output (what Person 3 depends on)
 
-## Priority Stack Rank
-
-If time runs short, cut in this order (bottom first):
-
-1. **MUST**: Seeded data → LLM plan → JSON output displayed
-2. **MUST**: Confirm action → execute → show result
-3. **MUST**: Savings summary on dashboard
-4. **SHOULD**: Playwright execution against demo portal
-5. **SHOULD**: Confidence scoring + regret risk display
-6. **NICE**: Audit log view
-7. **CUT**: Real integrations, auth, mobile
-
----
-
-## Sandbox Mode
-
-Include a toggle in the UI: `Use Demo Data`. When on:
-- No auth required
-- Pre-seeded 12 recurring streams loaded
-- LLM plan pre-generated (cache it for speed)
-- Playwright runs against local demo portal
-
-This ensures the demo always works regardless of network/API issues.
+`recurring_streams` table populated and `GET /recurring-streams` returning correct shape. See [TEAM.md](TEAM.md).
 
 ---
 
-## Demo Script (Rehearse This)
+## Person 3 — Intelligence / Agent
 
-1. Open app → "We analyzed your spend"
-2. Show stream list: "12 recurring charges found, $4,200/month"
-3. Click into top recommendation: "Notion — 16 seats, 0 logins in 90 days, $320/mo"
-4. Show AI explanation with evidence
-5. Click "Approve Cancellation"
-6. Watch status: Executing → Succeeded
-7. Show confirmation ID + screenshot proof
-8. Dashboard updates: "$320/month saved (verified)"
+**Stack**: Python, Anthropic SDK (Claude claude-sonnet-4-6), JSON schema validation (pydantic)
 
-Total demo time: ~3 minutes
+### Task List
+
+- [ ] `POST /agent/plan` endpoint
+  - Fetch `recurring_streams` from DB
+  - Build prompt (see [ACTION_ENGINE.md](ACTION_ENGINE.md) for prompt template)
+  - Call Claude claude-sonnet-4-6 with structured output (JSON schema constrained)
+  - Validate response against `ActionPlan` schema (pydantic model)
+  - Write `action_plans` + `recommendations` rows to DB
+  - Return `ActionPlan` JSON to caller
+- [ ] `POST /agent/confirm` endpoint
+  - Validate `recommendation_id` exists and is in `pending` status
+  - Write `action` row: status = `APPROVED`, `approved_by`, `approved_at`
+  - Return `{ action_id }`
+- [ ] Scoring logic (server-side, before LLM call):
+  - Compute `savings_score`, `regret_risk`, `confidence` per stream
+  - Pass scores as structured input to the LLM (don't ask LLM to infer from raw data)
+- [ ] Prompt engineering:
+  - System prompt with hard constraints (blocklist, schema rules, confirmation requirement)
+  - User message with structured stream data + org context
+  - Test with mock data offline before wiring endpoint
+- [ ] Pydantic models for `ActionPlan`, `ActionItem`, `Evidence` (share with Person 4)
+
+### Key Contracts
+
+- **Depends on**: `GET /recurring-streams` (Person 2)
+- **Produces for Person 1**: `ActionPlan` JSON (see [TEAM.md](TEAM.md))
+- **Produces for Person 4**: `actions` table row with `tool_args` JSON
+
+---
+
+## Person 4 — Execution / Policy
+
+**Stack**: Python (FastAPI), Playwright (Python or Node), a tiny Express/Next app for demo portal
+
+### Task List
+
+- [ ] Demo portal (build this first — Person 3's Playwright scripts depend on it):
+  - Simple web app (can be Next.js pages or plain HTML + Express)
+  - Routes: `/demo/login`, `/demo/subscriptions`, `/demo/confirm-cancel`, `/demo/receipt`
+  - Subscriptions page: list of 3–4 fake tools with "Cancel" buttons
+  - Receipt page: generate a random `confirmation_id` and display it
+- [ ] Policy engine (`policy.py`):
+  - Check `is_protected` flag on stream
+  - Check category blocklist: `['payroll', 'rent', 'mortgage', 'insurance', 'utility', 'tax']`
+  - Reject if action violates policy (return 403 with reason)
+- [ ] `POST /agent/execute` endpoint:
+  - Fetch `action` row, validate status = `APPROVED`
+  - Run policy check
+  - Update status → `EXECUTING`
+  - Dispatch to executor based on `channel` in `tool_args`:
+    - `browser` → `playwright_executor(runbook_id, args)`
+    - `email` → `email_stub(template_id, args)` (just logs for hackathon)
+  - On success: update status → `SUCCEEDED`, store evidence
+  - On failure: update status → `FAILED`, notify
+- [ ] Playwright executor (`executors/browser_cancel.py`):
+  - Targets local demo portal
+  - Login → navigate to subscriptions → click cancel → confirm → capture receipt
+  - Returns `{ confirmation_id, screenshot_path }`
+- [ ] Evidence storage: write to `action_evidence` table
+- [ ] `GET /actions/{id}` endpoint — returns action + evidence[]
+- [ ] `GET /savings/summary` endpoint — sums verified savings
+
+### Key Contracts
+
+- **Depends on**: `actions` table (Person 3 writes APPROVED row)
+- **Produces for Person 1**: `GET /actions/{id}` response with status + evidence
+
+---
+
+## Shared Setup (Everyone / First 2 Hours)
+
+- [ ] One repo, one `backend/` folder, one `frontend/` folder
+- [ ] Backend: FastAPI app skeleton + DB init + shared pydantic models
+- [ ] Frontend: Next.js scaffold + Tailwind config
+- [ ] `.env.example` with: `ANTHROPIC_API_KEY`, `DATABASE_URL`, `DEMO_PORTAL_URL`
+- [ ] `seed.py --reset` script (Person 2 leads, others can run it)
+
+**Do not block on each other.** If your dependency isn't ready, use the mock/stub from [TEAM.md](TEAM.md).
+
+---
+
+## Timeline
+
+| Hours | Milestone |
+|-------|-----------|
+| 0–2 | Shared setup: repo, DB init, FastAPI skeleton, Next.js scaffold |
+| 2–6 | Each person working in their lane using stubs for dependencies |
+| 6–10 | First integration: Person 1 + 2 (streams appear in UI) |
+| 10–14 | Second integration: Person 1 + 3 (ActionPlan renders in UI) |
+| 14–18 | Third integration: Person 1 + 4 (approve → execute → status shown) |
+| 18–22 | Full loop working end-to-end · UI polish · savings tracker |
+| 22–24 | Demo rehearsal · seed reset · README · slides |
+
+---
+
+## Priority Stack (cut from bottom if time runs short)
+
+1. **MUST**: `GET /recurring-streams` returns seeded data, UI displays it
+2. **MUST**: `POST /agent/plan` returns valid `ActionPlan` JSON, cards render in UI
+3. **MUST**: Approve action → execute → show status + confirmation ID
+4. **MUST**: Savings summary updates after execution
+5. **SHOULD**: Playwright execution against demo portal (vs. hardcoded mock response)
+6. **SHOULD**: Confidence + regret risk badges in UI
+7. **SHOULD**: Connector selection screen with mock OAuth
+8. **NICE**: Audit log view
+9. **CUT**: Real integrations, real auth, CSV parsing edge cases
+
+---
+
+## Demo Script (3 minutes — rehearse this)
+
+1. Open app → click "Use demo data" (skip connector flow for speed)
+2. Dashboard: "Found 12 recurring charges · $4,240/month"
+3. Navigate to Recommendations → show ranked cards
+4. Click into **Notion** card: "16 seats, 0 logins in 90 days, $320/mo"
+5. Show AI explanation: evidence, confidence badge, overlap with Confluence
+6. Click "Approve Cancellation" → confirmation modal
+7. Watch: Queued → Executing → Succeeded
+8. Show proof: confirmation ID + screenshot
+9. Dashboard updates: "$320/month verified savings"
+
+Total: ~3 min. Practice it until it's smooth.
