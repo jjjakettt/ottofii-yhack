@@ -4,17 +4,24 @@ import { createContext, useContext, useState } from "react";
 import type { Source } from "@/types";
 
 interface AppState {
-  connectedSource: Source | null;
-  setConnectedSource: (source: Source) => void;
+  connectedSources: Source[];
+  addConnectedSources: (sources: Source[]) => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [connectedSource, setConnectedSource] = useState<Source | null>(null);
+  const [connectedSources, setConnectedSources] = useState<Source[]>([]);
+
+  function addConnectedSources(sources: Source[]) {
+    setConnectedSources((prev) => {
+      const next = new Set<Source>([...prev, ...sources]);
+      return Array.from(next);
+    });
+  }
 
   return (
-    <AppContext.Provider value={{ connectedSource, setConnectedSource }}>
+    <AppContext.Provider value={{ connectedSources, addConnectedSources }}>
       {children}
     </AppContext.Provider>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Plus,
   TrendingDown,
   CheckCircle2,
   Clock,
@@ -94,19 +95,27 @@ export default function DashboardPage() {
 
       <main className="flex-1 px-6 py-6">
         <div className="mx-auto max-w-6xl space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
               <p className="text-sm text-muted-foreground">
                 Your detected subscriptions and spend overview
               </p>
             </div>
-            <Button asChild className="gap-2">
-              <Link href="/recommendations">
-                View Recommendations
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" asChild className="gap-2">
+                <Link href="/dashboard/connect">
+                  <Plus className="h-4 w-4" />
+                  Add Source
+                </Link>
+              </Button>
+              <Button asChild className="gap-2">
+                <Link href="/recommendations">
+                  View Recommendations
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

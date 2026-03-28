@@ -11,6 +11,20 @@ const navItems = [
   { href: "/recommendations", label: "Recommendations" },
 ];
 
+function isNavActive(pathname: string, href: string) {
+  if (href === "/dashboard") {
+    return (
+      pathname === "/dashboard" ||
+      pathname.startsWith("/dashboard/") ||
+      pathname.startsWith("/actions")
+    );
+  }
+  if (href === "/recommendations") {
+    return pathname === "/recommendations" || pathname.startsWith("/recommendations/");
+  }
+  return pathname === href;
+}
+
 export function AppHeader() {
   const pathname = usePathname();
 
@@ -21,22 +35,25 @@ export function AppHeader() {
           <Zap className="h-5 w-5 text-primary" />
           <span className="text-lg font-semibold tracking-tight">Ottofii</span>
         </Link>
-        <nav className="flex items-center gap-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "px-3 py-1.5 text-sm transition-colors",
-                pathname === item.href ||
-                  (item.href === "/dashboard" && pathname.startsWith("/actions"))
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
+        <nav className="flex items-center gap-1" aria-label="Main">
+          {navItems.map((item) => {
+            const active = isNavActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "bg-muted font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
       </div>
       <div className="ml-auto flex items-center gap-4">
