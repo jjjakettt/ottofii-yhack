@@ -101,25 +101,26 @@ Keep it deterministic. Fast, testable, inspectable. See ARCHITECTURE.md for rati
 
 ### Task List
 
-- [ ] `POST /agent/plan` endpoint
+- [x] `POST /agent/plan` endpoint
   - Fetch `recurring_streams` from DB
   - Build prompt (see [ACTION_ENGINE.md](ACTION_ENGINE.md) for prompt template)
-  - Call Claude claude-sonnet-4-6 with structured output (JSON schema constrained)
+  - Call OpenAI GPT-4o with structured output (Gemini fallback)
   - Validate response against `ActionPlan` schema (pydantic model)
   - Write `action_plans` + `recommendations` rows to DB
   - Return `ActionPlan` JSON to caller
-- [ ] `POST /agent/confirm` endpoint
+- [x] `POST /agent/confirm` endpoint
   - Validate `recommendation_id` exists and is in `pending` status
-  - Write `action` row: status = `APPROVED`, `approved_by`, `approved_at`
+  - Write `action` row: status = `approved`, `approved_by`, `tool_args`
   - Return `{ action_id }`
-- [ ] Scoring logic (server-side, before LLM call):
+- [x] Scoring logic (server-side, before LLM call):
   - Compute `savings_score`, `regret_risk`, `confidence` per stream
   - Pass scores as structured input to the LLM (don't ask LLM to infer from raw data)
-- [ ] Prompt engineering:
+- [x] Prompt engineering:
   - System prompt with hard constraints (blocklist, schema rules, confirmation requirement)
-  - User message with structured stream data + org context
-  - Test with mock data offline before wiring endpoint
-- [ ] Pydantic models for `ActionPlan`, `ActionItem`, `Evidence` (share with Person 4)
+  - User message with pre-scored stream data + user goal
+  - Tested with real DB data end-to-end
+- [x] Pydantic models for `ActionPlan`, `ActionItem`, `Evidence` (in schemas.py — Person 2)
+- [ ] `runbook_id` mapping — blocked on Person 4 defining runbook IDs
 
 ### Key Contracts
 

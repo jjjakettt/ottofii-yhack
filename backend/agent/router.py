@@ -21,7 +21,6 @@ class PlanRequest(BaseModel):
 async def agent_plan(req: PlanRequest, db: Session = Depends(get_db)):
     plan = await build_plan(req.user_goal)
 
-    # Persist action plan
     db_plan = ActionPlanModel(
         id=plan.plan_id,
         org_id=ORG_ID,
@@ -32,7 +31,6 @@ async def agent_plan(req: PlanRequest, db: Session = Depends(get_db)):
     )
     db.add(db_plan)
 
-    # Persist each recommendation
     for action in plan.actions:
         db_rec = Recommendation(
             id=action.recommendation_id,
@@ -63,15 +61,38 @@ def agent_confirm(req: ConfirmRequest, db: Session = Depends(get_db)):
     if not rec:
         raise HTTPException(status_code=404, detail="recommendation_id not found")
 
+    if rec.status != "pending":
+        raise HTTPException(status_code=409, detail=f"Recommendation is already {rec.status}")
+
+    # Look up strategy from the stored ActionPlan output
+    db_plan = db.query(ActionPlanModel).filter(ActionPlanModel.id == rec.plan_id).first()
+    strategy = {}
+    if db_plan and db_plan.raw_llm_output:
+        raw_actions = db_plan.raw_llm_output.get("actions", [])
+        match = next((a for a in raw_actions if a["recommendation_id"] == req.recommendation_id), None)
+        if match:
+            strategy = match.get("strategy", {})
+
     action_id = f"act_{uuid.uuid4().hex[:12]}"
     idempotency_key = f"{rec.action_type}_{rec.stream_id}"
+
+    tool_args = {
+        "stream_id": rec.stream_id,
+        "action_type": rec.action_type,
+        "idempotency_key": idempotency_key,
+        "channel": strategy.get("channel", "browser"),
+        "runbook_id": strategy.get("runbook_id"),
+        "fallback_channel": strategy.get("fallback_channel"),
+        "email_template_id": strategy.get("email_template_id"),
+    }
 
     db_action = Action(
         id=action_id,
         org_id=ORG_ID,
         recommendation_id=req.recommendation_id,
         idempotency_key=idempotency_key,
-        channel="browser",
+        channel=tool_args["channel"],
+        tool_args=tool_args,
         status="approved",
         approved_by=req.approved_by,
     )

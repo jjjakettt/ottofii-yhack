@@ -1,16 +1,19 @@
-from typing import List
-from schemas import RecurringStream
+import json
 
 SYSTEM_PROMPT = """You are an expert SaaS spend analyst. Your job is to analyze a company's recurring software subscriptions and produce a prioritized action plan to reduce costs.
 
-You will be given a list of recurring subscription streams and a user goal. You must output a JSON object that strictly follows the schema below.
+You will be given a list of pre-scored subscription streams and a user goal. Each stream includes:
+- Pre-computed `regret_risk_hint` — use this unless you have strong evidence to override it
+- Pre-computed `savings_score` (0–1) — use this to inform ranking (higher = more savings)
+- `confidence` — already computed by the detection layer, pass through as-is
+
+You must output a JSON object that strictly follows the schema below.
 
 Rules:
-- Only recommend actions for streams where there is clear evidence of waste (low/no usage, duplicates, or negotiation opportunity)
-- Never recommend cancelling a stream marked as is_protected=true
-- Rank actions by monthly_savings_usd descending (rank 1 = highest savings)
-- regret_risk must reflect how likely the user would regret the action (high usage = high regret risk)
-- explanation must be plain English, 1-2 sentences, suitable for a non-technical user
+- Only recommend actions where there is clear evidence of waste (low/no usage, duplicates, or negotiation opportunity)
+- Respect the `regret_risk_hint` — only override it if notes/usage clearly justify a different risk level
+- Rank actions by `savings_score` descending as a primary signal, adjusted by confidence (rank 1 = best)
+- `explanation` must be plain English, 1-2 sentences, suitable for a non-technical user
 - For action_type use: "cancel" (unused), "downgrade" (over-seated), "negotiate" (high spend, active), "switch" (duplicate exists)
 - channel should be "browser" for most SaaS cancellations, "email" for enterprise contracts
 - idempotency_key format: "{action_type}_{merchant_slug}_{stream_id}" (lowercase, underscores)
@@ -34,9 +37,9 @@ Output ONLY valid JSON matching this exact schema:
         "last_login_days_ago": <int or null>,
         "active_seat_count": <int or null>,
         "total_seat_count": <int or null>,
-        "duplicate_tools": [<string> or null],
+        "duplicate_tools": [<string>] or null,
         "benchmark_price_per_seat": <float or null>,
-        "sources": ["bank", "slack", ...]
+        "sources": ["bank", "slack"]
       },
       "strategy": {
         "channel": "browser|email|api",
@@ -58,11 +61,11 @@ Output ONLY valid JSON matching this exact schema:
 }"""
 
 
-def build_user_prompt(streams: List[RecurringStream], user_goal: str) -> str:
-    streams_json = "\n".join(s.model_dump_json(indent=2) for s in streams)
+def build_user_prompt(scored_streams: list[dict], user_goal: str) -> str:
+    streams_json = json.dumps(scored_streams, indent=2)
     return f"""User goal: {user_goal}
 
-Recurring subscription streams to analyze:
+Pre-scored subscription streams to analyze:
 {streams_json}
 
 Produce the action plan JSON now."""
