@@ -181,3 +181,16 @@ class SavingsSummary(BaseModel):
     actions_succeeded: int
     actions_pending: int
     actions_failed: int
+
+
+class ExecuteRequest(BaseModel):
+    action_id: str
+
+
+class ExecuteResponse(BaseModel):
+    action_id: str
+    status: ActionStatus
+
+
+# Alias — avoids naming collision with ActionEvidence ORM model in routers
+ActionEvidenceSchema = ActionEvidence

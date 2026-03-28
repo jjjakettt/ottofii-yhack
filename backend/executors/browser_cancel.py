@@ -33,9 +33,9 @@ async def browser_cancel(
     Automate a cancellation through the demo portal.
 
     Args:
-        subscription_id: matches data-subscription-id on the subscriptions page
-                         (e.g. "stream_001" for Notion)
-        merchant:        human-readable name used in URL params (e.g. "Notion")
+        subscription_id: DB stream ID (UUID) — used as fallback label only
+        merchant:        human-readable name (e.g. "Notion") — used to find
+                         the cancel button via data-merchant attribute
 
     Returns dict with confirmation_id, screenshot_base64, mime.
     Raises RuntimeError on any failure with a descriptive message.
@@ -55,14 +55,17 @@ async def browser_cancel(
             # ── Step 2: Subscriptions list ─────────────────────────────────
             await page.wait_for_url("**/demo/subscriptions", timeout=10_000)
 
+            # Match by merchant name (lowercase) — works regardless of DB stream ID format
+            merchant_key = merchant.lower()
             cancel_button = page.locator(
-                f'button[data-subscription-id="{subscription_id}"][data-action="cancel"]'
+                f'button[data-merchant="{merchant_key}"][data-action="cancel"]'
             )
 
             if not await cancel_button.is_visible():
                 raise RuntimeError(
-                    f"Cancel button not found for subscription_id='{subscription_id}'. "
-                    f"Check that the demo portal subscriptions list includes this stream."
+                    f"Cancel button not found for merchant='{merchant}'. "
+                    f"Check that '{merchant}' exists in the demo portal subscriptions list "
+                    f"and that data-merchant matches '{merchant_key}'."
                 )
 
             await cancel_button.click()
