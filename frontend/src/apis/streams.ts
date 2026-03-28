@@ -1,7 +1,9 @@
+import { API_BASE_URL } from "@/config/api";
 import type { RecurringStreamsResponse } from "@/types";
-import { mockStreamsResponse } from "@/data/streams";
 
 // GET /recurring-streams
 export async function getRecurringStreams(): Promise<RecurringStreamsResponse> {
-  return mockStreamsResponse;
+  const res = await fetch(`${API_BASE_URL}/recurring-streams`);
+  if (!res.ok) throw new Error(`getRecurringStreams failed: ${res.status}`);
+  return res.json();
 }
