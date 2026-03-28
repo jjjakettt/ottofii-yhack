@@ -2,10 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 import { CreditCard, Mail, MessageSquare, FileSpreadsheet, ArrowRight, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-type Source = "bank" | "gmail" | "slack" | "csv" | "demo";
+import { connectSource } from "@/apis/connect";
+import type { Source } from "@/types";
 
 const connectors: { source: Source; icon: ReactNode; title: string; description: string }[] = [
   {
@@ -37,28 +38,16 @@ const connectors: { source: Source; icon: ReactNode; title: string; description:
 export default function ConnectPage() {
   const router = useRouter();
   const [hoveredSource, setHoveredSource] = useState<Source | null>(null);
-  const [loading, setLoading] = useState<Source | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [activeSource, setActiveSource] = useState<Source | null>(null);
 
-  async function handleConnect(source: Source) {
-    setLoading(source);
-    setError(null);
-    try {
-      const response = await fetch("/api/connect/mock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source }),
-      });
-      if (!response.ok) {
-        throw new Error(`Connect request failed with status ${response.status}`);
-      }
-      router.push("/dashboard");
-    } catch (err) {
-      console.error("Failed to connect source", err);
-      setError("Something went wrong while connecting. Please try again.");
-    } finally {
-      setLoading(null);
-    }
+  const { mutate: connect, error } = useMutation({
+    mutationFn: (source: Source) => connectSource(source),
+    onSuccess: () => router.push("/dashboard"),
+  });
+
+  function handleConnect(source: Source) {
+    setActiveSource(source);
+    connect(source);
   }
 
   return (
@@ -69,21 +58,21 @@ export default function ConnectPage() {
       </p>
       {error && (
         <p className="text-sm text-red-600 mb-6" role="alert">
-          {error}
+          Something went wrong while connecting. Please try again.
         </p>
       )}
 
       <div className="w-full max-w-xl flex flex-col gap-3">
         {connectors.map(({ source, icon, title, description }) => {
           const isHovered = hoveredSource === source;
-          const isLoading = loading === source;
+          const isLoading = activeSource === source;
           return (
             <button
               key={source}
               onClick={() => handleConnect(source)}
               onMouseEnter={() => setHoveredSource(source)}
               onMouseLeave={() => setHoveredSource(null)}
-              disabled={!!loading}
+              disabled={!!activeSource}
               className={`flex items-center gap-4 w-full px-5 py-4 rounded-lg border bg-white text-left transition-all
                 ${isHovered ? "border-violet-400 bg-gray-50 shadow-sm" : "border-gray-200"}
                 ${isLoading ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
@@ -118,9 +107,9 @@ export default function ConnectPage() {
           variant="outline"
           className="w-full border-violet-400 text-violet-600 hover:bg-violet-50 hover:text-violet-700 gap-2 h-11"
           onClick={() => handleConnect("demo")}
-          disabled={!!loading}
+          disabled={!!activeSource}
         >
-          {loading === "demo" ? (
+          {activeSource === "demo" ? (
             <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
           ) : (
             <Play className="w-4 h-4" />
