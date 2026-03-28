@@ -8,12 +8,21 @@ import uuid
 from datetime import datetime
 from sqlalchemy.orm import Session
 from database import SessionLocal
-from models import User, Connection, RecurringStream
+from models import User, Connection, RecurringStream, ActionEvidence, Action, Recommendation, ActionPlan
 from seed_data import RECURRING_STREAMS, DEMO_ORG_ID, DEMO_USER_ID
 
 
 def reset_db(db: Session):
     print("Resetting seed data...")
+    # Delete in reverse FK dependency order
+    db.query(ActionEvidence).filter(
+        ActionEvidence.action_id.in_(
+            db.query(Action.id).filter(Action.org_id == DEMO_ORG_ID)
+        )
+    ).delete(synchronize_session="fetch")
+    db.query(Action).filter(Action.org_id == DEMO_ORG_ID).delete()
+    db.query(Recommendation).filter(Recommendation.org_id == DEMO_ORG_ID).delete()
+    db.query(ActionPlan).filter(ActionPlan.org_id == DEMO_ORG_ID).delete()
     db.query(RecurringStream).filter(RecurringStream.org_id == DEMO_ORG_ID).delete()
     db.query(Connection).filter(Connection.org_id == DEMO_ORG_ID).delete()
     db.query(User).filter(User.id == DEMO_USER_ID).delete()

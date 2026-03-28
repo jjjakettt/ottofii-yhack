@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import connect, streams
+from routers import connect, streams, actions
 from agent.router import router as agent_router
 
 app = FastAPI(title="Ottofii API", version="0.1.0")
@@ -17,7 +17,7 @@ app.include_router(connect.router)
 app.include_router(streams.router)
 app.include_router(agent_router, prefix="/agent", tags=["agent"])
 
-# Person 4 adds: from routers import actions; app.include_router(actions.router)
+app.include_router(actions.router)
 
 
 @app.get("/health")
