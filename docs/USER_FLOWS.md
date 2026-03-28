@@ -1,188 +1,291 @@
-# User Flows
+# User Flow
 
-Ottofii serves four enterprise personas. Each has a different goal, different level of access, and different interaction pattern with the system.
-
----
-
-## Persona 1 — CFO / Finance Leader (Strategic)
-
-**Goal**: Visibility + control over total recurring spend. Make high-level policy decisions.
-
-```
-┌─────────────────────────────────────────────────┐
-│  CFO FLOW                                       │
-│                                                 │
-│  1. Connect systems                             │
-│     ERP · Corporate cards · SaaS inventory      │
-│                                                 │
-│  2. See dashboard                               │
-│     "$2.3M annual savings identified"           │
-│     Breakdown: waste / underutilization /       │
-│                vendor overlap                   │
-│                                                 │
-│  3. Drill into categories                       │
-│     "SaaS: 14 unused tools ($480K)"             │
-│     "Cloud: overprovisioned ($210K)"            │
-│     "Contracts: 3 up for renewal ($590K)"       │
-│                                                 │
-│  4. Set automation policy                       │
-│     "Auto-cancel tools < $5K/year"              │
-│     "Flag contracts > $50K for review"          │
-│     "Never touch: AWS prod, Salesforce, Okta"   │
-│                                                 │
-│  5. View realized savings over time             │
-│     Verified · Pending · Rejected               │
-└─────────────────────────────────────────────────┘
-```
-
-**Output**: Org-wide policy configuration + executive savings report
-
-**Key UI elements**: Savings dashboard, policy editor, category drill-down
+One generic flow that works for any user — individual, startup, or enterprise team.
+The goal: connect your tools, see what you're wasting, take action.
 
 ---
 
-## Persona 2 — Finance / AP Team (Operators)
-
-**Goal**: Review and execute AI recommendations. Handle day-to-day spend optimization.
+## The Core Loop
 
 ```
-┌─────────────────────────────────────────────────┐
-│  AP TEAM FLOW                                   │
-│                                                 │
-│  1. Open action inbox                           │
-│     AI-generated recommendations queue          │
-│                                                 │
-│  2. Review recommendation                       │
-│     "Notion — 16 seats, 0 logins 90 days"       │
-│     "$320/month · confidence: 87%"              │
-│     Evidence: usage chart, purchase history,    │
-│               similar tools detected            │
-│                                                 │
-│  3. Approve / reject / defer                    │
-│     One-click approve                           │
-│     Batch approve (low-risk category)           │
-│     Add note for audit trail                    │
-│                                                 │
-│  4. Watch execution                             │
-│     Status: Queued → Executing → Succeeded      │
-│     Proof: confirmation ID / screenshot         │
-│                                                 │
-│  5. Track outcomes                              │
-│     Savings realized this month                 │
-│     Actions pending verification                │
-│     Failed actions needing manual follow-up     │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  1. CONNECT                                                 │
+│     User connects one or more data sources                  │
+│     (or uses sandbox demo data — no auth required)          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. DETECT                                                  │
+│     System ingests + normalizes data across all sources     │
+│     Recurring streams identified with confidence scores     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. ANALYZE                                                 │
+│     AI generates ranked ActionPlan (structured JSON)        │
+│     Each action: savings estimate, evidence, risk level     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  4. DECIDE                                                  │
+│     User reviews recommendations with AI explanations       │
+│     Approves, rejects, or defers each action                │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  5. EXECUTE                                                 │
+│     System carries out approved actions                     │
+│     Live status: Queued → Executing → Succeeded             │
+│     Proof shown: confirmation ID / screenshot               │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  6. VERIFY + TRACK                                          │
+│     Savings marked verified vs pending                      │
+│     Audit log of every action taken                         │
+└─────────────────────────────────────────────────────────────┘
 ```
-
-**Output**: Executed cancellations/downgrades + savings tracking
-
-**Key UI elements**: Recommendation inbox, approval modal, action status, evidence view
 
 ---
 
-## Persona 3 — IT / Engineering (Guardrails)
+## Step 1 — Connect
 
-**Goal**: Prevent AI from touching critical infrastructure or production tools.
+User lands on a connector page. Pick one or more sources. Each is a mock/stub for the hackathon.
 
 ```
-┌─────────────────────────────────────────────────┐
-│  IT FLOW                                        │
-│                                                 │
-│  1. View SaaS inventory with usage signals      │
-│     Tool · Owner team · Monthly cost · Logins   │
-│                                                 │
-│  2. Set tool constraints                        │
-│     "Mark as protected": AWS, GitHub, PagerDuty │
-│     Protected tools never appear in AI queue    │
-│                                                 │
-│  3. Review technical action proposals           │
-│     "Downsize EC2 instance class"               │
-│     Must approve before execution               │
-│                                                 │
-│  4. See integration health                      │
-│     Connector status · Last sync                │
-│     Data freshness per source                   │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Connect your tools                                         │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  💳 Bank /   │  │  📧 Gmail /  │  │  💬 Slack    │     │
+│  │    Cards     │  │    Email     │  │              │     │
+│  │              │  │              │  │              │     │
+│  │  Catches     │  │  Catches     │  │  Catches     │     │
+│  │  charges +   │  │  renewal     │  │  SaaS tool   │     │
+│  │  recurring   │  │  notices,    │  │  installs +  │     │
+│  │  payments    │  │  invoices,   │  │  usage       │     │
+│  │              │  │  receipts    │  │  signals     │     │
+│  │  [ Connect ] │  │  [ Connect ] │  │  [ Connect ] │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                                                             │
+│  ┌──────────────┐                                          │
+│  │  📄 CSV /    │                                          │
+│  │   Upload     │                                          │
+│  │              │                                          │
+│  │  Upload any  │                                          │
+│  │  transaction │                                          │
+│  │  export      │                                          │
+│  │              │                                          │
+│  │  [ Upload ]  │                                          │
+│  └──────────────┘                                          │
+│                                                             │
+│  ─────────────── or ───────────────                        │
+│                                                             │
+│  [ Use demo data — no account needed ]                     │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**Output**: Protected tool list + technical action approvals
+### What each connector contributes
 
-**Key UI elements**: Tool inventory, protection flags, integration status dashboard
+| Connector | What it detects | Why it matters |
+|-----------|----------------|----------------|
+| **Bank / Cards** | Recurring charges by merchant, amount, cadence | Highest coverage backbone — catches most subscriptions |
+| **Gmail / Email** | Renewal notices, invoices, receipts, trial → paid conversions | Catches things that don't show clearly on card statements (app stores, intermediated billing) |
+| **Slack** | Which SaaS apps are installed as integrations; workspace activity signals | Surfaces tools the team has but nobody uses; strong zero-usage signal |
+| **CSV Upload** | Any transaction export from any bank, card, or accounting tool | Universal fallback — works for anyone, no OAuth needed |
+
+### Connector behavior (hackathon implementation)
+
+All connectors are **mocked** — they don't make real OAuth calls. When a user "connects":
+1. Show an OAuth-style consent screen (fake)
+2. After "authorize", load a pre-seeded dataset for that source
+3. Combine all connected source datasets into the unified `recurring_streams` table
+
+Sandbox mode bypasses step 1–2 entirely and loads the full seeded dataset directly.
 
 ---
 
-## Persona 4 — Procurement (Vendor Optimization)
+## Step 2 — Detect
 
-**Goal**: Reduce vendor costs through renegotiation, consolidation, and switching.
+After connecting, the system runs detection automatically.
 
 ```
-┌─────────────────────────────────────────────────┐
-│  PROCUREMENT FLOW                               │
-│                                                 │
-│  1. See vendor intelligence                     │
-│     "Paying $X for Figma — market rate $Y"      │
-│     "3 overlapping project management tools"    │
-│                                                 │
-│  2. Review AI suggestions                       │
-│     "Consolidate to one PM tool: save $18K/yr"  │
-│     "Renegotiate Salesforce at renewal"         │
-│     AI provides: benchmark pricing, scripts     │
-│                                                 │
-│  3. Generate negotiation assets                 │
-│     Draft renegotiation email                   │
-│     Competitive pricing benchmarks              │
-│     Talking points for vendor call              │
-│                                                 │
-│  4. Track vendor actions                        │
-│     Negotiations in progress                    │
-│     Renewals coming up (30/60/90 day view)      │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Analyzing your connected sources...                        │
+│                                                             │
+│  ✓ Bank/Cards      → 847 transactions scanned              │
+│  ✓ Gmail           → 312 emails parsed                     │
+│  ✓ Slack           → 23 app integrations found             │
+│                                                             │
+│  [████████████████████████] 100%                           │
+│                                                             │
+│  Found 12 recurring streams                                 │
+│  Estimated monthly spend: $4,240                           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**Output**: Renegotiation scripts + vendor consolidation recommendations
-
-**Key UI elements**: Vendor overlap view, renewal calendar, negotiation assistant
+Detection logic (runs server-side):
+- Group by normalized merchant name across all sources
+- Detect periodic patterns: monthly / annual / quarterly
+- Flag low/zero usage from Slack signals and email activity
+- Detect vendor overlaps (two tools in same category)
+- Apply blocklist: payroll, rent, insurance, utilities → never flagged
 
 ---
 
-## Consumer Flow (Extension, Same Backend)
+## Step 3 — Analyze (AI Action Plan)
+
+AI reads all detected streams and generates a ranked `ActionPlan`.
 
 ```
-┌─────────────────────────────────────────────────┐
-│  CONSUMER FLOW                                  │
-│                                                 │
-│  1. Connect bank (Plaid) or upload CSV          │
-│                                                 │
-│  2. See subscription summary                    │
-│     "You're paying $340/month in subscriptions" │
-│     "We think you can save $120/month"          │
-│                                                 │
-│  3. Review per-subscription                     │
-│     Last used · Cost · Recommendation           │
-│                                                 │
-│  4. One-click approve cancel                    │
-│                                                 │
-│  5. See confirmation + savings tracker          │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Your Savings Opportunities                                 │
+│                                                             │
+│  Potential monthly savings: $1,870                         │
+│  Potential annual savings:  $22,440                        │
+│                                                             │
+│  12 recurring charges · 8 with recommendations             │
+│  4 skipped (active / protected)                            │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Same backend, simpler UX, no approval routing, no policy engine complexity.
+Each recommendation card shows:
+- Merchant name + logo
+- Monthly cost + seat count (if applicable)
+- AI-generated explanation with evidence
+- Confidence badge: High / Medium / Low
+- Regret risk badge: Low / Medium / High
+- Suggested action: Cancel / Downgrade / Negotiate
 
 ---
 
-## Safe Mode vs Autonomous Mode (All Personas)
+## Step 4 — Decide
+
+User reviews each recommendation and approves or dismisses.
 
 ```
-SAFE MODE (default)
-──────────────────
-AI detects → proposes action + explains → user approves → executes → verifies
-Every action requires a human decision. Full audit trail.
-
-AUTONOMOUS MODE (enterprise, policy-scoped)
-───────────────────────────────────────────
-AI detects → policy check → auto-execute if within thresholds → verify → notify
-Example: "Auto-cancel tools under $2K/year with 0 logins for 90 days"
-Requires: explicit policy config, approval gates for edge cases, kill switches
+┌─────────────────────────────────────────────────────────────┐
+│  #1  Notion                              $320/month         │
+│      16 seats · monthly · SaaS                             │
+│                                                             │
+│  Why we flagged this:                                       │
+│  "0 logins across all 16 seats in the last 90 days.        │
+│   Confluence is active for the same use case.              │
+│   Cancellation is low-risk."                               │
+│                                                             │
+│  Evidence: 0 active seats · last login 97 days ago         │
+│            Duplicate: Confluence (active)                   │
+│            Source: Bank charge + Gmail renewal notice       │
+│                                                             │
+│  Confidence: ●●●○  High      Regret risk: Low              │
+│                                                             │
+│  [ ✓ Cancel — save $320/mo ]   [ ✗ Dismiss ]   [ Defer ]  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Autonomous mode is the premium differentiator — where Ottofii becomes an operator, not just a dashboard.
+Confirmation modal before execution:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Confirm cancellation                                       │
+│                                                             │
+│  Cancel Notion subscription                                 │
+│  16 seats · $320/month                                     │
+│                                                             │
+│  This action will be executed via browser automation.      │
+│  You can undo this within 24 hours if needed.              │
+│                                                             │
+│  [ Cancel subscription ]      [ Go back ]                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Step 5 — Execute
+
+Live status shown in UI after approval.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Notion · Cancel subscription                               │
+│                                                             │
+│  ⏳ Queued                                                  │
+│  ⚙️  Executing... (navigating vendor portal)               │
+│  ✅ Succeeded                                               │
+│                                                             │
+│  Confirmation ID: NOT-2024-38291                           │
+│  [ View screenshot proof ]                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+On failure:
+```
+│  ⚠️  Execution failed — vendor portal changed              │
+│  We'll retry via email. You can also handle this manually. │
+│  [ Send cancellation email ]   [ Mark as manual ]          │
+```
+
+---
+
+## Step 6 — Verify + Track
+
+Savings dashboard updates after each action.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Savings Tracker                                            │
+│                                                             │
+│  Verified savings this month:    $320  ✅                  │
+│  Pending verification:           $480  ⏳                  │
+│  Actions taken:                  3                         │
+│  Actions pending your review:    5                         │
+│                                                             │
+│  [ View audit log ]                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Flow Diagram (end-to-end)
+
+```
+User
+ │
+ ├─ Selects connectors (Bank · Gmail · Slack · CSV)
+ │   └─ [mock OAuth] → seeded data loaded per source
+ │
+ ├─ Detection runs
+ │   └─ recurring_streams table populated with confidence scores
+ │
+ ├─ POST /agent/plan
+ │   └─ LLM reads streams → returns ActionPlan JSON
+ │
+ ├─ User reviews recommendation cards
+ │   ├─ Dismiss → status = rejected
+ │   └─ Approve → POST /agent/confirm
+ │                └─ action row created (status = APPROVED)
+ │
+ ├─ POST /agent/execute
+ │   └─ Playwright runs against demo portal
+ │       ├─ success → status = SUCCEEDED, evidence stored
+ │       └─ failure → status = FAILED, retry / escalate
+ │
+ └─ Dashboard updates with verified savings
+```
+
+---
+
+## Future: Role-Based Views
+
+Once the core loop is proven, role-based views are just a filter + permission layer on top:
+
+- **CFO**: sees aggregate dashboard + policy config
+- **AP / Finance**: sees the recommendation inbox (what we built for MVP)
+- **IT**: sees tool inventory + can mark tools as protected
+- **Procurement**: sees vendor overlap + negotiation suggestions
+
+The underlying flow and data model don't change — just what each role sees and can act on.
