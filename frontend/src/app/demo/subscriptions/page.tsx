@@ -76,6 +76,24 @@ const SUBSCRIPTIONS = [
     cadence: "monthly",
     status: "Active",
   },
+  {
+    id: "stream_005",
+    merchant: "AWS",
+    plan: "Dev Environment",
+    seats: null,
+    amount: 890,
+    cadence: "monthly",
+    status: "Active",
+  },
+  {
+    id: "stream_011",
+    merchant: "Heroku",
+    plan: "Staging",
+    seats: null,
+    amount: 340,
+    cadence: "monthly",
+    status: "Active",
+  },
 ];
 
 export default function DemoSubscriptions() {
@@ -87,7 +105,7 @@ export default function DemoSubscriptions() {
       merchant: sub.merchant,
       amount: sub.amount.toString(),
       plan: sub.plan,
-      seats: sub.seats.toString(),
+      seats: sub.seats?.toString() ?? "",
     });
     router.push(`/demo/confirm-cancel?${params.toString()}`);
   }
@@ -128,7 +146,7 @@ export default function DemoSubscriptions() {
                 <div>
                   <p className="font-semibold text-gray-900">{sub.merchant}</p>
                   <p className="text-sm text-gray-500">
-                    {sub.plan} · {sub.seats} seats
+                    {sub.plan}{sub.seats != null ? ` · ${sub.seats} seats` : ""}
                   </p>
                 </div>
               </div>
@@ -144,6 +162,7 @@ export default function DemoSubscriptions() {
                 </div>
                 <button
                   data-subscription-id={sub.id}
+                  data-merchant={sub.merchant.toLowerCase()}
                   data-action="cancel"
                   onClick={() => handleCancel(sub)}
                   className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
