@@ -9,9 +9,9 @@ export const useAction = (actionId: string) => {
   const query = useQuery<ActionDetail>({
     queryKey: actionKey(actionId),
     queryFn: () => getAction(actionId),
-    // poll every 3s while executing
+    // Poll while mock agent is “executing” so status flips without a full page wait.
     refetchInterval: (query) =>
-      query.state.data?.status === "executing" ? 3000 : false,
+      query.state.data?.status === "executing" ? 400 : false,
     enabled: !!actionId,
   });
 

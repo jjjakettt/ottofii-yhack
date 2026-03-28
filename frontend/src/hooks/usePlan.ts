@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getActionPlan, confirmAction, executeAction } from "@/apis/agent";
+import { MOCK_EXECUTION_SUCCESS_MS } from "@/lib/action-execution-mock";
 import { planKey, actionKey, savingsSummaryKey } from "./keys";
 import type { ActionPlan } from "@/types";
 
@@ -36,10 +37,12 @@ export const useExecuteAction = (actionId: string) => {
   return useMutation({
     mutationFn: () => executeAction(actionId),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: actionKey(actionId) }),
-        queryClient.invalidateQueries({ queryKey: savingsSummaryKey() }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: actionKey(actionId) });
+      // Mock run completes asynchronously; refetch when overlay flips to succeeded.
+      window.setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: actionKey(actionId) });
+        void queryClient.invalidateQueries({ queryKey: savingsSummaryKey() });
+      }, MOCK_EXECUTION_SUCCESS_MS + 150);
     },
   });
 };
