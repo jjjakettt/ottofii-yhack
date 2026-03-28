@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
+import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
 import { useExecuteAction } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
@@ -178,14 +179,7 @@ export default function ActionStatusPage() {
   const execute = useExecuteAction(id);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <AppHeader />
-        <main className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </main>
-      </div>
-    );
+    return <AppLoading message="Loading action…" />;
   }
 
   if (error || !action) {

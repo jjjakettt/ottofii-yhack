@@ -12,9 +12,11 @@ import {
   Check,
   X,
   Info,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
+import { AppLoading } from "@/components/app-loading";
 import { useConfirmAction, usePlan } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
 import type { ActionItem, SkippedStream } from "@/types";
@@ -68,6 +70,7 @@ function RecommendationCard({
   onDismiss: () => void;
   isApproving: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const actionConfig = actionTypeConfig[recommendation.action_type];
   const ActionIcon = actionConfig.icon;
   const riskConfig = regretRiskConfig[recommendation.regret_risk];
@@ -76,18 +79,31 @@ function RecommendationCard({
 
   return (
     <div className="border border-border bg-card">
-      <div className="flex items-start justify-between border-b border-border p-4">
-        <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+        aria-label={
+          expanded
+            ? `Collapse details for ${recommendation.merchant}`
+            : `Expand details for ${recommendation.merchant}`
+        }
+        className={cn(
+          "flex w-full items-start justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/40",
+          expanded && "border-b border-border"
+        )}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <div
             className={cn(
-              "flex h-10 w-10 items-center justify-center border border-border bg-background",
+              "flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-background",
               actionConfig.className
             )}
           >
             <ActionIcon className="h-5 w-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold">{recommendation.merchant}</span>
               <span
                 className={cn(
@@ -98,7 +114,7 @@ function RecommendationCard({
                 {actionConfig.label}
               </span>
             </div>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
               <span className={riskConfig.className}>{riskConfig.label}</span>
               <span>
                 Confidence:{" "}
@@ -109,17 +125,28 @@ function RecommendationCard({
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-xl font-semibold tabular-nums text-success">
-            {formatCurrency(recommendation.monthly_savings_usd)}
-            <span className="text-sm font-normal text-muted-foreground">/mo</span>
+        <div className="flex shrink-0 items-start gap-2">
+          <div className="text-right">
+            <div className="font-mono text-xl font-semibold tabular-nums text-success">
+              {formatCurrency(recommendation.monthly_savings_usd)}
+              <span className="text-sm font-normal text-muted-foreground">/mo</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {formatCurrency(recommendation.annual_savings_usd)}/yr
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {formatCurrency(recommendation.annual_savings_usd)}/yr
-          </div>
+          <ChevronDown
+            className={cn(
+              "mt-1 h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
+              expanded && "rotate-180"
+            )}
+            aria-hidden
+          />
         </div>
-      </div>
+      </button>
 
+      {expanded ? (
+        <>
       <div className="border-b border-border p-4">
         <p className="text-sm text-foreground">{recommendation.explanation}</p>
       </div>
@@ -208,6 +235,8 @@ function RecommendationCard({
           Approve
         </Button>
       </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -270,17 +299,7 @@ export default function RecommendationsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <AppHeader />
-        <main className="flex flex-1 items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Generating recommendations...
-            </p>
-          </div>
-        </main>
-      </div>
+      <AppLoading message="Generating recommendations…" />
     );
   }
 
