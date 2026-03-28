@@ -269,7 +269,7 @@ function SkippedSection({ skipped }: { skipped: SkippedStream[] }) {
 
 export default function RecommendationsPage() {
   const router = useRouter();
-  const { plan, isLoading } = usePlan();
+  const { plan, isLoading, isFetching } = usePlan();
   const confirm = useConfirmAction();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -297,15 +297,20 @@ export default function RecommendationsPage() {
     setDismissed((prev) => [...prev, recommendationId]);
   }
 
-  if (isLoading) {
-    return (
-      <AppLoading message="Generating recommendations…" />
-    );
+  if (isLoading && !plan) {
+    return <AppLoading message="Generating recommendations…" />;
   }
 
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
+
+      {isFetching && plan && (
+        <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-6 py-2 text-sm text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Refreshing recommendations…
+        </div>
+      )}
 
       <main className="flex-1 px-6 py-6">
         <div className="mx-auto max-w-4xl space-y-6">
