@@ -38,26 +38,40 @@ export default function ConnectPage() {
   const router = useRouter();
   const [hoveredSource, setHoveredSource] = useState<Source | null>(null);
   const [loading, setLoading] = useState<Source | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleConnect(source: Source) {
     setLoading(source);
+    setError(null);
     try {
-      await fetch("/api/connect/mock", {
+      const response = await fetch("/api/connect/mock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source }),
       });
-    } catch {
+      if (!response.ok) {
+        throw new Error(`Connect request failed with status ${response.status}`);
+      }
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Failed to connect source", err);
+      setError("Something went wrong while connecting. Please try again.");
+    } finally {
+      setLoading(null);
     }
-    router.push("/dashboard");
   }
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 bg-gray-50 px-4 py-16">
       <h1 className="text-4xl font-bold text-gray-900 mb-3">Connect your data</h1>
-      <p className="text-gray-500 mb-10 text-base">
+      <p className="text-gray-500 mb-4 text-base">
         Link a data source to start detecting wasted SaaS spend
       </p>
+      {error && (
+        <p className="text-sm text-red-600 mb-6" role="alert">
+          {error}
+        </p>
+      )}
 
       <div className="w-full max-w-xl flex flex-col gap-3">
         {connectors.map(({ source, icon, title, description }) => {
