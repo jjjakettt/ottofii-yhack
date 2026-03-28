@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Ottofi",
+  title: "Ottofii",
   description: "Stay afloat by shedding financial weight",
 };
 
