@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard, Mail, MessageSquare, FileSpreadsheet, ArrowRight, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Source = "bank" | "gmail" | "slack" | "csv" | "demo";
 
-const connectors: { source: Source; icon: React.ReactNode; title: string; description: string }[] = [
+const connectors: { source: Source; icon: ReactNode; title: string; description: string }[] = [
   {
     source: "bank",
     icon: <CreditCard className="w-5 h-5 text-gray-600" />,
