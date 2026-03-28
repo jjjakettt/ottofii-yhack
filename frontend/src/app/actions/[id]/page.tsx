@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -17,10 +18,124 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
+import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
 import { useExecuteAction } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
-import type { ActionStatus as ActionStatusType } from "@/types";
+import type { ActionStatus as ActionStatusType, ActionType } from "@/types";
+
+function agentStepMessages(
+  actionType: ActionType,
+  merchant: string
+): string[] {
+  const m = merchant;
+  switch (actionType) {
+    case "cancel":
+      return [
+        `Mapping ${m} subscription footprint…`,
+        "Opening secure browser session…",
+        "Locating cancellation controls…",
+        "Submitting cancellation request…",
+        "Waiting for provider confirmation…",
+      ];
+    case "downgrade":
+      return [
+        `Analyzing ${m} seat usage…`,
+        "Checking downgrade eligibility…",
+        "Drafting plan change…",
+        "Applying new tier…",
+      ];
+    case "negotiate":
+      return [
+        `Gathering ${m} contract signals…`,
+        "Drafting negotiation brief…",
+        "Simulating savings scenarios…",
+        "Preparing outreach…",
+      ];
+    case "switch":
+      return [
+        `Comparing ${m} alternatives…`,
+        "Validating migration path…",
+        "Provisioning target workspace…",
+        "Cutting over traffic…",
+      ];
+    default:
+      return [
+        "Initializing agent…",
+        "Connecting to workspace…",
+        "Running verification…",
+        "Applying changes…",
+      ];
+  }
+}
+
+function AgentExecutionSteps({
+  active,
+  actionType,
+  merchant,
+}: {
+  active: boolean;
+  actionType: ActionType;
+  merchant: string;
+}) {
+  const steps = useMemo(
+    () => agentStepMessages(actionType, merchant),
+    [actionType, merchant]
+  );
+  const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setStepIndex(0);
+      return;
+    }
+    setStepIndex(0);
+    const id = window.setInterval(() => {
+      setStepIndex((i) => (i + 1) % steps.length);
+    }, 1300);
+    return () => window.clearInterval(id);
+  }, [active, actionType, merchant]);
+
+  if (!active) return null;
+
+  return (
+    <div
+      className="border-b border-border bg-muted/30 p-6"
+      role="status"
+      aria-live="polite"
+      aria-label="Agent execution progress"
+    >
+      <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+        Agent working
+      </div>
+      <p
+        key={stepIndex}
+        className="min-h-[3rem] text-sm leading-relaxed text-foreground"
+      >
+        {steps[stepIndex]}
+        <span className="ml-0.5 inline-block w-6 animate-pulse text-muted-foreground">
+          …
+        </span>
+      </p>
+      <div className="mt-4 flex gap-1">
+        {steps.map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              "h-1 flex-1 rounded-full transition-colors",
+              i === stepIndex
+                ? "bg-primary"
+                : i < stepIndex
+                  ? "bg-primary/40"
+                  : "bg-border"
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -178,14 +293,7 @@ export default function ActionStatusPage() {
   const execute = useExecuteAction(id);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <AppHeader />
-        <main className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </main>
-      </div>
-    );
+    return <AppLoading message="Loading action…" />;
   }
 
   if (error || !action) {
@@ -266,9 +374,16 @@ export default function ActionStatusPage() {
               </div>
             </div>
 
+            <AgentExecutionSteps
+              active={action.status === "executing"}
+              actionType={action.action_type}
+              merchant={action.merchant}
+            />
+
             {action.status === "approved" && (
               <div className="border-b border-border p-6">
                 <Button
+                  type="button"
                   onClick={() => execute.mutate()}
                   disabled={execute.isPending}
                   className="gap-2"
@@ -338,13 +453,6 @@ export default function ActionStatusPage() {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {!terminal && action.status !== "proposed" && (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating status...
             </div>
           )}
 

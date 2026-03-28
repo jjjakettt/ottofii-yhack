@@ -8,10 +8,10 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
+import { AppLoading } from "@/components/app-loading";
 import { useStreams } from "@/hooks/useStreams";
 import { useSavingsSummary } from "@/hooks/useAction";
 import { cn } from "@/lib/utils";
@@ -79,14 +79,7 @@ export default function DashboardPage() {
   const savings = summary;
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <AppHeader />
-        <main className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </main>
-      </div>
-    );
+    return <AppLoading message="Loading your dashboard…" />;
   }
 
   return (
@@ -201,45 +194,67 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {streams.map((stream) => (
-                    <tr
-                      key={stream.id}
-                      className="border-b border-border last:border-0"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{stream.merchant}</span>
-                          {stream.is_protected && (
-                            <span className="text-xs text-muted-foreground">
-                              Protected
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm capitalize text-muted-foreground">
-                        {stream.category}
-                      </td>
-                      <td className="px-4 py-3 text-sm capitalize text-muted-foreground">
-                        {stream.cadence}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-mono text-sm tabular-nums">
-                          {formatCurrency(stream.amount_usd)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-mono text-sm tabular-nums text-muted-foreground">
-                          {stream.seat_count ?? "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <UsageIndicator signal={stream.usage_signal} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <ConfidenceBar confidence={stream.confidence} />
+                  {streams.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-12 text-center align-middle"
+                      >
+                        <p className="text-sm font-medium text-foreground">
+                          No subscriptions detected yet
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Connect a source to scan for recurring SaaS spend.
+                        </p>
+                        <Button variant="outline" asChild className="mt-4 gap-2">
+                          <Link href="/dashboard/connect">
+                            <Plus className="h-4 w-4" />
+                            Add Source
+                          </Link>
+                        </Button>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    streams.map((stream) => (
+                      <tr
+                        key={stream.id}
+                        className="border-b border-border last:border-0"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{stream.merchant}</span>
+                            {stream.is_protected && (
+                              <span className="text-xs text-muted-foreground">
+                                Protected
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm capitalize text-muted-foreground">
+                          {stream.category}
+                        </td>
+                        <td className="px-4 py-3 text-sm capitalize text-muted-foreground">
+                          {stream.cadence}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="font-mono text-sm tabular-nums">
+                            {formatCurrency(stream.amount_usd)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                            {stream.seat_count ?? "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <UsageIndicator signal={stream.usage_signal} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <ConfidenceBar confidence={stream.confidence} />
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
