@@ -73,8 +73,14 @@ def agent_confirm(req: ConfirmRequest, db: Session = Depends(get_db)):
         if match:
             strategy = match.get("strategy", {})
 
-    action_id = f"act_{uuid.uuid4().hex[:12]}"
     idempotency_key = f"{rec.action_type}_{rec.stream_id}"
+
+    # Check 1: double-confirm guard — return existing action if already confirmed
+    existing = db.query(Action).filter(Action.idempotency_key == idempotency_key).first()
+    if existing:
+        return ConfirmResponse(action_id=existing.id)
+
+    action_id = f"act_{uuid.uuid4().hex[:12]}"
 
     tool_args = {
         "stream_id": rec.stream_id,

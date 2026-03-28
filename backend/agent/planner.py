@@ -2,6 +2,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 import httpx
 from openai import OpenAI
 from google import genai as genai_client
@@ -145,12 +146,48 @@ async def build_plan(user_goal: str) -> ActionPlan:
     user_prompt = build_user_prompt(scoreable, user_goal)
     raw = _call_llm(SYSTEM_PROMPT, user_prompt)
 
-    actions = [_parse_action_item(a) for a in raw.get("actions", [])]
+    # Build lookup maps from pre-scored data
+    valid_stream_ids = {s["stream_id"] for s in scoreable}
+    monthly_cap = {s["stream_id"]: s["monthly_equivalent_usd"] for s in scoreable}
 
-    # Merge LLM skips with pre-scored protected skips
+    valid_actions = []
+    hallucinated_skipped = []
+
+    for raw_action in raw.get("actions", []):
+        sid = raw_action.get("stream_id")
+
+        # Check 2: stream_id must exist in our fetched streams
+        if sid not in valid_stream_ids:
+            hallucinated_skipped.append(SkippedStream(
+                stream_id=sid or "unknown",
+                merchant=raw_action.get("merchant", "unknown"),
+                reason="Skipped: stream_id not found in recurring streams.",
+            ))
+            continue
+
+        action = _parse_action_item(raw_action)
+
+        # Check 3: cap savings at the stream's actual monthly spend
+        cap = monthly_cap.get(sid, action.monthly_savings_usd)
+        if action.monthly_savings_usd > cap:
+            action.monthly_savings_usd = round(cap, 2)
+            action.annual_savings_usd = round(cap * 12, 2)
+
+        valid_actions.append(action)
+
+    actions = valid_actions
+
+    # Check 4: empty plan guard
+    if not actions:
+        raise HTTPException(
+            status_code=400,
+            detail="No actionable streams found. All streams are active or protected.",
+        )
+
+    # Merge all skipped sources
     llm_skipped = [SkippedStream(**s) for s in raw.get("skipped", [])]
     protected_skipped = [SkippedStream(**s) for s in pre_skipped]
-    skipped = protected_skipped + llm_skipped
+    skipped = protected_skipped + hallucinated_skipped + llm_skipped
 
     total_monthly = sum(a.monthly_savings_usd for a in actions)
     total_annual = sum(a.annual_savings_usd for a in actions)
