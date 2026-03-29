@@ -11,11 +11,12 @@ import re
 
 # Rep may say "confirmation number is X", "your reference is X", etc.
 _CONFIRMATION_NUMBER_PATTERNS: tuple[re.Pattern[str], ...] = (
-    # Explicit "number is …" avoids capturing the word "number" as the ID
+    # "confirmation number C2384" or "confirmation number is C2384"
     re.compile(
-        r"\b(?:confirmation|reference)\s+number\s+is\s+([A-Z0-9][A-Z0-9\-]{3,})\b",
+        r"\b(?:confirmation|reference)\s+number\s+(?:is\s+)?([A-Z0-9][A-Z0-9\-]{3,})\b",
         re.IGNORECASE,
     ),
+    # "confirmation: C2384" or "confirmation C2384"
     re.compile(
         r"\bconfirmation\s*(?:code|#)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{3,})\b",
         re.IGNORECASE,
@@ -90,6 +91,8 @@ def cancellation_confirmed_in_transcript(transcript: list[dict]) -> bool:
         "canceled",
         "cancellation is complete",
         "cancellation has been processed",
+        "processed the cancellation",
+        "processed your cancellation",
         "subscription has been cancelled",
         "subscription has been canceled",
         "order has been cancelled",
@@ -105,10 +108,13 @@ def cancellation_confirmed_in_transcript(transcript: list[dict]) -> bool:
         "membership has been cancelled",
         "i've cancelled",
         "i have cancelled",
-        "processed your cancellation",
         "we've cancelled",
         "we have cancelled",
         "that's confirmed",
         "all set on the cancellation",
+        "gone ahead and cancelled",
+        "gone ahead and canceled",
+        "taken care of the cancellation",
+        "all set for you",
     )
     return any(p in text for p in phrases)
