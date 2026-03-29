@@ -6,10 +6,13 @@ Endpoints:
   GET  /savings/summary     — returns verified + pending savings totals
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from database import get_db
 from models import Action, ActionEvidence, AuditEvent, Recommendation, RecurringStream
@@ -65,7 +68,10 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
         # ── Execute via Playwright (unless merchant forces phone fallback) ─────
         browser_error: str | None = None
 
+        logger.info("[execution] Starting action_id=%s merchant=%s", action_id, merchant)
+
         if merchant.lower() in PHONE_FALLBACK_MERCHANTS:
+            logger.info("[execution] %s is in PHONE_FALLBACK_MERCHANTS — skipping browser, going to phone", merchant)
             browser_error = (
                 f"Browser automation unavailable for '{merchant}': "
                 "vendor portal returned an unexpected response. "
@@ -114,9 +120,12 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
                 browser_error = str(e)
 
         # ── Phone fallback via ElevenLabs ─────────────────────────────────────
+        logger.info("[execution] Browser failed for %s: %s", merchant, browser_error)
+        logger.info("[execution] Looking up phone contacts for merchant=%s", merchant)
+
         contacts = get_contacts(merchant)
         if not contacts:
-            # No phone contacts configured — mark as failed
+            logger.warning("[execution] No phone contacts found for %s — marking failed", merchant)
             action.status = "failed"
             action.executed_at = _now()
             _write_audit(db, "action.failed", "action", action_id, {
@@ -127,6 +136,7 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
             return
 
         contact = contacts[0]
+        logger.info("[execution] Calling %s at %s for %s", contact["name"], contact["phone"], merchant)
 
         # Record the browser failure so the UI can show what happened
         db.add(ActionEvidence(
@@ -152,14 +162,17 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
         db.commit()
 
         try:
+            logger.info("[execution] Initiating ElevenLabs call → %s (%s)", contact["phone"], contact["name"])
             conversation_id = await initiate_call(
                 to_number=contact["phone"],
                 full_name=DEMO_ACCOUNT["full_name"],
                 account_phone=DEMO_ACCOUNT["phone"],
                 subscription_name=merchant,
             )
+            logger.info("[execution] Call initiated conversation_id=%s — now polling", conversation_id)
 
             conv_data = await poll_call_until_done(conversation_id)
+            logger.info("[execution] Call completed for conversation_id=%s", conversation_id)
 
             transcript_text = format_transcript(conv_data.get("transcript", []))
             db.add(ActionEvidence(
@@ -192,6 +205,7 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
             })
 
         except RuntimeError as call_error:
+            logger.error("[execution] ElevenLabs call failed for %s: %s", merchant, call_error)
             action.status = "failed"
             action.executed_at = _now()
             _write_audit(db, "action.failed", "action", action_id, {
@@ -204,6 +218,65 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
 
     finally:
         db.close()
+
+
+# ── POST /actions/{action_id}/retry ──────────────────────────────────────────
+
+@router.post("/actions/{action_id}/retry", response_model=ExecuteResponse)
+async def retry_action(
+    action_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Reset a failed action back to executing and re-run the executor.
+    Clears previous evidence so the UI shows a clean retry attempt.
+    """
+    action = db.query(Action).filter(Action.id == action_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+
+    if action.status != "failed":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Action is in state '{action.status}', only 'failed' actions can be retried.",
+        )
+
+    recommendation = db.query(Recommendation).filter(
+        Recommendation.id == action.recommendation_id
+    ).first()
+    if not recommendation:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    stream = db.query(RecurringStream).filter(
+        RecurringStream.id == recommendation.stream_id
+    ).first()
+    if not stream:
+        raise HTTPException(status_code=404, detail="Recurring stream not found")
+
+    # Clear previous evidence
+    db.query(ActionEvidence).filter(ActionEvidence.action_id == action_id).delete()
+
+    # Reset action state
+    action.status = "executing"
+    action.executed_at = None
+    action.channel = "browser"
+    db.commit()
+
+    _write_audit(db, "action.retry", "action", action_id, {"merchant": stream.merchant})
+    db.commit()
+
+    tool_args = action.tool_args or {}
+    subscription_id = tool_args.get("stream_id", recommendation.stream_id)
+
+    background_tasks.add_task(
+        _run_execution,
+        action_id=str(action.id),
+        subscription_id=str(subscription_id),
+        merchant=str(stream.merchant),
+    )
+
+    return ExecuteResponse(action_id=str(action.id), status="executing")
 
 
 # ── POST /agent/execute ───────────────────────────────────────────────────────

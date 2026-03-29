@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getActionPlan, confirmAction, rejectAction, executeAction, getRecommendations } from "@/apis/agent";
+import { getActionPlan, confirmAction, rejectAction, restoreRecommendation, executeAction, getRecommendations } from "@/apis/agent";
 import { planKey, actionKey, savingsSummaryKey, recommendationsKey } from "./keys";
 import type { ActionPlan, RecommendationsResponse, RejectResponse } from "@/types";
 
@@ -61,6 +61,17 @@ export const useRejectAction = () => {
 
   return useMutation<RejectResponse, Error, { recommendationId: string; rejectedBy?: string }>({
     mutationFn: ({ recommendationId, rejectedBy }) => rejectAction(recommendationId, rejectedBy),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["recommendations"] });
+    },
+  });
+};
+
+export const useRestoreAction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { recommendationId: string }>({
+    mutationFn: ({ recommendationId }) => restoreRecommendation(recommendationId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["recommendations"] });
     },

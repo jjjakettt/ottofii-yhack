@@ -26,6 +26,16 @@ export async function confirmAction(
   return res.json();
 }
 
+// POST /agent/restore
+export async function restoreRecommendation(recommendationId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/agent/restore`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recommendation_id: recommendationId, rejected_by: "user_demo" }),
+  });
+  if (!res.ok) throw new Error(`POST /agent/restore failed: ${res.status}`);
+}
+
 // POST /agent/reject
 export async function rejectAction(
   recommendationId: string,
@@ -55,5 +65,14 @@ export async function executeAction(actionId: string): Promise<ExecuteResponse> 
     body: JSON.stringify({ action_id: actionId }),
   });
   if (!res.ok) throw new Error(`POST /agent/execute failed: ${res.status}`);
+  return res.json();
+}
+
+// POST /actions/{action_id}/retry
+export async function retryAction(actionId: string): Promise<ExecuteResponse> {
+  const res = await fetch(`${API_BASE_URL}/actions/${actionId}/retry`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`POST /actions/${actionId}/retry failed: ${res.status}`);
   return res.json();
 }

@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Filter,
   RefreshCw,
+  Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +38,7 @@ import {
   useRecommendations,
   useConfirmAction,
   useRejectAction,
+  useRestoreAction,
   useGeneratePlan,
 } from "@/hooks/usePlan";
 import { executeAction } from "@/apis/agent";
@@ -177,8 +179,10 @@ function RecommendationCard({
   action,
   onApprove,
   onReject,
+  onRestore,
   isApproving,
   isRejecting,
+  isRestoring,
   showActions,
   bulkBusy = false,
   selection,
@@ -186,8 +190,10 @@ function RecommendationCard({
   action: RecommendationItem;
   onApprove: () => void;
   onReject: () => void;
+  onRestore: () => void;
   isApproving: boolean;
   isRejecting: boolean;
+  isRestoring: boolean;
   showActions: boolean;
   bulkBusy?: boolean;
   selection?: {
@@ -380,6 +386,21 @@ function RecommendationCard({
               </Button>
             </div>
           )}
+
+          {action.status === "rejected" && (
+            <div className="flex items-center justify-end gap-2 p-4">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onRestore}
+                disabled={isRestoring}
+                className="gap-1.5"
+              >
+                {isRestoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+                Changed my mind
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -407,9 +428,11 @@ export default function RecommendationsPage() {
 
   const confirm = useConfirmAction();
   const reject = useRejectAction();
+  const restore = useRestoreAction();
   const generatePlan = useGeneratePlan();
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return recommendations.filter((r) => {
@@ -454,6 +477,15 @@ export default function RecommendationsPage() {
       await reject.mutateAsync({ recommendationId });
     } finally {
       setRejectingId(null);
+    }
+  }
+
+  async function handleRestore(recommendationId: string) {
+    setRestoringId(recommendationId);
+    try {
+      await restore.mutateAsync({ recommendationId });
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -760,8 +792,10 @@ export default function RecommendationsPage() {
                   action={action}
                   onApprove={() => handleApprove(action.recommendation_id)}
                   onReject={() => handleReject(action.recommendation_id)}
+                  onRestore={() => handleRestore(action.recommendation_id)}
                   isApproving={approvingId === action.recommendation_id}
                   isRejecting={rejectingId === action.recommendation_id}
+                  isRestoring={restoringId === action.recommendation_id}
                   showActions={action.status === "pending"}
                   bulkBusy={bulkBusy}
                   selection={

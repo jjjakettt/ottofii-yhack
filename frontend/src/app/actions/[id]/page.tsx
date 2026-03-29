@@ -17,11 +17,14 @@ import {
   ArrowRightLeft,
   Phone,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
 import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
+import { useQueryClient } from "@tanstack/react-query";
+import { retryAction } from "@/apis/agent";
 import { formatEvidencePrimaryLine, getScreenshotDataUrl } from "@/lib/evidence-display";
 import { cn } from "@/lib/utils";
 import type { ActionEvidence, ActionStatus as ActionStatusType, ActionType } from "@/types";
@@ -430,6 +433,9 @@ export default function ActionStatusPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
   const { action, isLoading, error } = useAction(id);
+  const queryClient = useQueryClient();
+  const [isRetrying, setIsRetrying] = useState(false);
+
   if (isLoading) {
     return <AppLoading message="Loading action…" />;
   }
@@ -449,6 +455,16 @@ export default function ActionStatusPage() {
         </main>
       </div>
     );
+  }
+
+  async function handleRetry() {
+    setIsRetrying(true);
+    try {
+      await retryAction(id);
+      queryClient.invalidateQueries({ queryKey: ["action", id] });
+    } finally {
+      setIsRetrying(false);
+    }
   }
 
   const statusInfo = statusConfig[action.status];
@@ -563,10 +579,19 @@ export default function ActionStatusPage() {
 
           {terminal && (
             <div className="flex justify-center gap-3">
+              {action.status === "failed" && (
+                <Button onClick={handleRetry} disabled={isRetrying} className="gap-2">
+                  {isRetrying
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <RefreshCw className="h-4 w-4" />
+                  }
+                  Retry
+                </Button>
+              )}
               <Button variant="outline" asChild>
                 <Link href="/dashboard">View Dashboard</Link>
               </Button>
-              <Button asChild>
+              <Button variant={action.status === "failed" ? "outline" : "default"} asChild>
                 <Link href="/recommendations">More Recommendations</Link>
               </Button>
             </div>
