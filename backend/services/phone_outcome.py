@@ -49,7 +49,11 @@ def extract_confirmation_number_from_transcript(transcript: list[dict]) -> str |
         return None
 
     junk = frozenset(
-        {"number", "code", "here", "the", "your", "this", "that", "is", "are", "was"}
+        {
+            "number", "code", "here", "the", "your", "this", "that", "is", "are", "was",
+            "process", "processed", "complete", "completed", "cancelled", "canceled",
+            "subscription", "account", "request", "cancellation", "done",
+        }
     )
 
     for pat in _CONFIRMATION_NUMBER_PATTERNS:
@@ -59,10 +63,7 @@ def extract_confirmation_number_from_transcript(transcript: list[dict]) -> str |
             low = raw.lower()
             if len(raw) < 4 or low in junk:
                 continue
-            # Prefer IDs that look like references (digit or hyphen) unless very long token
-            if any(c.isdigit() for c in raw) or "-" in raw or len(raw) >= 8:
-                return raw
-            if len(raw) >= 6 and low not in junk:
+            if any(c.isdigit() for c in raw):
                 return raw
     return None
 

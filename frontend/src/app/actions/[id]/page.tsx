@@ -67,16 +67,7 @@ function CallTranscriptEvidence({
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border bg-muted/50 px-4 py-3 sm:px-5">
           <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
-          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            {agentName} is the voice agent on this call.{" "}
-            <span className="text-foreground/90">
-              Account holder and phone number are taken from the backend demo profile and sent to ElevenLabs as
-              dynamic variables (the same values as{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">full_name</code> and{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">phone_number</code> in your
-              agent prompt).
-            </span>
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{agentName} is the voice agent on this call.</p>
         </div>
 
         {(accountHolder != null || accountPhone != null || merchant != null) && (
