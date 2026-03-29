@@ -8,7 +8,7 @@ export async function getActionPlan(userGoal = "Reduce my monthly spend"): Promi
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_goal: userGoal }),
   });
-  if (!res.ok) throw new Error(`getActionPlan failed: ${res.status}`);
+  if (!res.ok) throw new Error(`POST /agent/plan failed: ${res.status}`);
   return res.json();
 }
 
@@ -22,7 +22,7 @@ export async function confirmAction(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ recommendation_id: recommendationId, approved_by: approvedBy }),
   });
-  if (!res.ok) throw new Error(`confirmAction failed: ${res.status}`);
+  if (!res.ok) throw new Error(`POST /agent/confirm failed: ${res.status}`);
   return res.json();
 }
 
@@ -36,14 +36,14 @@ export async function rejectAction(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ recommendation_id: recommendationId, rejected_by: rejectedBy }),
   });
-  if (!res.ok) throw new Error(`rejectAction failed: ${res.status}`);
+  if (!res.ok) throw new Error(`POST /agent/reject failed: ${res.status}`);
   return res.json();
 }
 
 // GET /recommendations?status=pending|completed|all
 export async function getRecommendations(status = "pending"): Promise<RecommendationsResponse> {
   const res = await fetch(`${API_BASE_URL}/recommendations?status=${status}`);
-  if (!res.ok) throw new Error(`getRecommendations failed: ${res.status}`);
+  if (!res.ok) throw new Error(`GET /recommendations failed: ${res.status}`);
   return res.json();
 }
 
@@ -54,6 +54,6 @@ export async function executeAction(actionId: string): Promise<ExecuteResponse> 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action_id: actionId }),
   });
-  if (!res.ok) throw new Error(`executeAction failed: ${res.status}`);
+  if (!res.ok) throw new Error(`POST /agent/execute failed: ${res.status}`);
   return res.json();
 }

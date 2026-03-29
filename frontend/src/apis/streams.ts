@@ -1,5 +1,6 @@
-import { API_BASE_URL } from "@/config/api";
 import type { RecurringStreamsResponse } from "@/types";
+
+import { API_BASE_URL } from "@/config/api";
 
 // GET /recurring-streams
 export async function getRecurringStreams(): Promise<RecurringStreamsResponse> {
