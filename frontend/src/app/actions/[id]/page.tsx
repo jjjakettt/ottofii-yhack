@@ -20,8 +20,9 @@ import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
 import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
+import { formatEvidencePrimaryLine, getScreenshotDataUrl } from "@/lib/evidence-display";
 import { cn } from "@/lib/utils";
-import type { ActionStatus as ActionStatusType, ActionType } from "@/types";
+import type { ActionEvidence, ActionStatus as ActionStatusType, ActionType } from "@/types";
 
 function agentStepMessages(
   actionType: ActionType,
@@ -155,6 +156,58 @@ function formatDateTime(iso: string | null): string {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function EvidenceBlock({ ev }: { ev: ActionEvidence }) {
+  const screenshotSrc =
+    ev.type === "screenshot" ? getScreenshotDataUrl(ev.payload) : null;
+  const title =
+    ev.type === "confirmation_id"
+      ? "Confirmation ID"
+      : ev.type === "email"
+        ? "Email"
+        : "Screenshot";
+
+  return (
+    <div className="p-4">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-background">
+          {ev.type === "confirmation_id" ? (
+            <FileCheck className="h-5 w-5 text-success" />
+          ) : (
+            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="text-sm font-medium capitalize">{title}</div>
+          {ev.type === "screenshot" && screenshotSrc ? (
+            <img
+              src={screenshotSrc}
+              alt="Execution screenshot"
+              className="max-h-[28rem] w-full max-w-full rounded-md border border-border object-contain object-left"
+            />
+          ) : ev.type === "screenshot" && ev.payload.path ? (
+            <p className="break-all font-mono text-sm text-foreground">{ev.payload.path}</p>
+          ) : ev.type === "confirmation_id" && ev.payload.id ? (
+            <p className="break-all font-mono text-sm text-foreground">{ev.payload.id}</p>
+          ) : ev.type === "email" ? (
+            <div className="space-y-1 text-sm">
+              {ev.payload.subject && <p className="font-medium">{ev.payload.subject}</p>}
+              {ev.payload.body && (
+                <pre className="whitespace-pre-wrap break-words font-sans text-muted-foreground">
+                  {ev.payload.body}
+                </pre>
+              )}
+            </div>
+          ) : (
+            <p className="break-all font-mono text-sm text-muted-foreground">
+              {formatEvidencePrimaryLine(ev) ?? JSON.stringify(ev.payload)}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const statusConfig: Record<
@@ -407,32 +460,13 @@ export default function ActionStatusPage() {
             <div className="border border-border bg-card">
               <div className="border-b border-border px-6 py-4">
                 <h2 className="font-medium">Proof of Completion</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Action results and artifacts from execution.
+                </p>
               </div>
               <div className="divide-y divide-border">
                 {action.evidence.map((ev, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4">
-                    <div className="flex h-10 w-10 items-center justify-center border border-border bg-background">
-                      {ev.type === "confirmation_id" ? (
-                        <FileCheck className="h-5 w-5 text-success" />
-                      ) : (
-                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium capitalize">
-                        {ev.type === "confirmation_id"
-                          ? "Confirmation ID"
-                          : ev.type === "email"
-                            ? "Email"
-                            : "Screenshot"}
-                      </div>
-                      <div className="font-mono text-sm text-muted-foreground">
-                        {ev.payload.id ??
-                          ev.payload.path ??
-                          JSON.stringify(ev.payload)}
-                      </div>
-                    </div>
-                  </div>
+                  <EvidenceBlock key={index} ev={ev} />
                 ))}
               </div>
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -17,8 +18,10 @@ import {
   X,
   CheckCircle2,
   Filter,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -30,7 +33,12 @@ import {
 } from "@/components/ui/select";
 import { AppHeader } from "@/components/app-header";
 import { AppLoading } from "@/components/app-loading";
-import { useRecommendations, useConfirmAction, useRejectAction } from "@/hooks/usePlan";
+import {
+  useRecommendations,
+  useConfirmAction,
+  useRejectAction,
+  useGeneratePlan,
+} from "@/hooks/usePlan";
 import { executeAction } from "@/apis/agent";
 import { cn } from "@/lib/utils";
 import type { RecommendationItem, RecommendationStatus, RegretRisk, ActionType } from "@/types";
@@ -174,6 +182,8 @@ function RecommendationCard({
   isApproving,
   isRejecting,
   showActions,
+  bulkBusy = false,
+  selection,
 }: {
   action: RecommendationItem;
   onApprove: () => void;
@@ -181,6 +191,12 @@ function RecommendationCard({
   isApproving: boolean;
   isRejecting: boolean;
   showActions: boolean;
+  bulkBusy?: boolean;
+  selection?: {
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+    disabled?: boolean;
+  };
 }) {
   const [expanded, setExpanded] = useState(false);
   const ev = action.evidence;
@@ -188,15 +204,32 @@ function RecommendationCard({
 
   return (
     <div className={cn("border border-border bg-card", action.status === "rejected" && "opacity-60")}>
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
+      <div
         className={cn(
-          "flex w-full items-start justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/40",
+          "flex w-full items-stretch",
           expanded && "border-b border-border"
         )}
       >
+        {selection && (
+          <div
+            className="flex shrink-0 items-start pt-4 pl-3"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={selection.checked}
+              disabled={selection.disabled}
+              onCheckedChange={(v) => selection.onCheckedChange(v === true)}
+              aria-label={`Select ${action.merchant}`}
+            />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-start justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/40"
+        >
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -233,7 +266,31 @@ function RecommendationCard({
             aria-hidden
           />
         </div>
-      </button>
+        </button>
+      </div>
+
+      {action.status !== "pending" &&
+        (action.action_id || action.result_confirmation_id) && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-muted/15 px-4 py-2.5 text-xs">
+            <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+              Action result
+            </span>
+            {action.result_confirmation_id && (
+              <span className="text-muted-foreground">
+                Confirmation{" "}
+                <span className="font-mono text-foreground">{action.result_confirmation_id}</span>
+              </span>
+            )}
+            {action.action_id && (
+              <Link
+                href={`/actions/${action.action_id}`}
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                View execution details
+              </Link>
+            )}
+          </div>
+        )}
 
       {expanded && (
         <>
@@ -304,13 +361,18 @@ function RecommendationCard({
                 size="sm"
                 variant="outline"
                 onClick={onReject}
-                disabled={isRejecting || isApproving}
+                disabled={isRejecting || isApproving || bulkBusy}
                 className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 {isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                 Reject
               </Button>
-              <Button size="sm" onClick={onApprove} disabled={isApproving || isRejecting} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={onApprove}
+                disabled={isApproving || isRejecting || bulkBusy}
+                className="gap-1.5"
+              >
                 {isApproving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -339,14 +401,47 @@ export default function RecommendationsPage() {
   const [tab, setTab] = useState<Tab>("pending");
   const [riskFilter, setRiskFilter] = useState<RegretRisk | "all">("all");
   const [actionTypeFilter, setActionTypeFilter] = useState<ActionType | "all">("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkMode, setBulkMode] = useState<"approve" | "reject" | null>(null);
 
   const { recommendations, totalMonthlySavings, totalAnnualSavings, isLoading, isFetching } =
     useRecommendations(tab === "pending" ? "pending" : "done");
 
   const confirm = useConfirmAction();
   const reject = useRejectAction();
+  const generatePlan = useGeneratePlan();
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    return recommendations.filter((r) => {
+      if (riskFilter !== "all" && r.regret_risk !== riskFilter) return false;
+      if (actionTypeFilter !== "all" && r.action_type !== actionTypeFilter) return false;
+      return true;
+    });
+  }, [recommendations, riskFilter, actionTypeFilter]);
+
+  const pendingSelectableIds = useMemo(
+    () => filtered.filter((r) => r.status === "pending").map((r) => r.recommendation_id),
+    [filtered]
+  );
+
+  const selectedPendingIds = useMemo(
+    () => selectedIds.filter((id) => pendingSelectableIds.includes(id)),
+    [selectedIds, pendingSelectableIds]
+  );
+
+  useEffect(() => {
+    if (tab !== "pending") setSelectedIds([]);
+  }, [tab]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => pendingSelectableIds.includes(id)));
+  }, [pendingSelectableIds]);
+
+  const allPendingSelected =
+    pendingSelectableIds.length > 0 && selectedPendingIds.length === pendingSelectableIds.length;
+  const bulkBusy = bulkMode !== null;
 
   async function handleApprove(recommendationId: string) {
     setApprovingId(recommendationId);
@@ -368,11 +463,51 @@ export default function RecommendationsPage() {
     }
   }
 
-  const filtered = recommendations.filter((r) => {
-    if (riskFilter !== "all" && r.regret_risk !== riskFilter) return false;
-    if (actionTypeFilter !== "all" && r.action_type !== actionTypeFilter) return false;
-    return true;
-  });
+  async function handleBulkApprove() {
+    if (selectedPendingIds.length === 0) return;
+    setBulkMode("approve");
+    try {
+      for (const recommendationId of selectedPendingIds) {
+        const { action_id } = await confirm.mutateAsync({ recommendationId });
+        await executeAction(action_id);
+      }
+      setSelectedIds([]);
+    } catch {
+      /* mutations surface errors via react-query */
+    } finally {
+      setBulkMode(null);
+    }
+  }
+
+  async function handleBulkReject() {
+    if (selectedPendingIds.length === 0) return;
+    setBulkMode("reject");
+    try {
+      for (const recommendationId of selectedPendingIds) {
+        await reject.mutateAsync({ recommendationId });
+      }
+      setSelectedIds([]);
+    } catch {
+      /* react-query */
+    } finally {
+      setBulkMode(null);
+    }
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    if (checked) setSelectedIds([...pendingSelectableIds]);
+    else setSelectedIds([]);
+  }
+
+  function toggleOne(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      if (checked) {
+        if (prev.includes(id)) return prev;
+        return [...prev, id];
+      }
+      return prev.filter((x) => x !== id);
+    });
+  }
 
   const filtersActive = riskFilter !== "all" || actionTypeFilter !== "all";
 
@@ -394,25 +529,41 @@ export default function RecommendationsPage() {
       <main className="flex-1 px-6 py-6">
         <div className="mx-auto max-w-4xl space-y-6">
           {/* Header */}
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Recommendations</h1>
               <p className="text-sm text-muted-foreground">
                 AI-generated actions to reduce your SaaS spend
               </p>
             </div>
-            {tab === "pending" && totalMonthlySavings > 0 && (
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground">Savings Potential</div>
-                <div className="font-mono text-2xl font-semibold tabular-nums text-success">
-                  {formatCurrency(totalMonthlySavings)}
-                  <span className="text-sm font-normal text-muted-foreground">/mo</span>
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={generatePlan.isPending || bulkBusy}
+                onClick={() => generatePlan.mutate(undefined)}
+              >
+                <RefreshCw
+                  className={cn("size-4", generatePlan.isPending && "animate-spin")}
+                  aria-hidden
+                />
+                Regenerate recommendations
+              </Button>
+              {tab === "pending" && totalMonthlySavings > 0 && (
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">Savings Potential</div>
+                  <div className="font-mono text-2xl font-semibold tabular-nums text-success">
+                    {formatCurrency(totalMonthlySavings)}
+                    <span className="text-sm font-normal text-muted-foreground">/mo</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatCurrency(totalAnnualSavings)} annually
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {formatCurrency(totalAnnualSavings)} annually
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Tabs + inline count + filter popover */}
@@ -549,6 +700,72 @@ export default function RecommendationsPage() {
             </div>
           </div>
 
+          {tab === "pending" && pendingSelectableIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={
+                    allPendingSelected
+                      ? true
+                      : selectedPendingIds.length > 0
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={(v) => toggleSelectAll(v === true)}
+                  disabled={bulkBusy}
+                  aria-label="Select all pending recommendations"
+                />
+                <span className="text-sm text-muted-foreground">Select all</span>
+              </div>
+              {selectedPendingIds.length > 0 && (
+                <>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {selectedPendingIds.length} selected
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={bulkBusy}
+                    onClick={handleBulkApprove}
+                  >
+                    {bulkMode === "approve" ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Check className="size-4" aria-hidden />
+                    )}
+                    Approve selected
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={bulkBusy}
+                    onClick={handleBulkReject}
+                  >
+                    {bulkMode === "reject" ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <X className="size-4" aria-hidden />
+                    )}
+                    Reject selected
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    disabled={bulkBusy}
+                    onClick={() => setSelectedIds([])}
+                  >
+                    Clear
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* List */}
           {filtered.length > 0 ? (
             <div className="space-y-3">
@@ -561,6 +778,16 @@ export default function RecommendationsPage() {
                   isApproving={approvingId === action.recommendation_id}
                   isRejecting={rejectingId === action.recommendation_id}
                   showActions={action.status === "pending"}
+                  bulkBusy={bulkBusy}
+                  selection={
+                    tab === "pending" && action.status === "pending"
+                      ? {
+                          checked: selectedIds.includes(action.recommendation_id),
+                          onCheckedChange: (c) => toggleOne(action.recommendation_id, c),
+                          disabled: bulkBusy,
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>
