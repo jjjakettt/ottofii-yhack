@@ -30,6 +30,50 @@ The problem isn't awareness. It's execution. Canceling subscriptions requires lo
 
 ## Demo Walkthrough
 
+### Landing Page
+
+![Landing page — hero](frontend/screenshots/landing_page_1.png)
+*Hero: "The SaaS cleanup you've been putting off for months." — $48/employee/month average waste. One-click to start.*
+
+![Landing page — before vs. after](frontend/screenshots/landing_page_2.png)
+*Before vs. After: Finding subscriptions manually vs. Ottofii scanning bank, Gmail, and ERP automatically. Cancelling via 15-step hold music vs. Ottofii navigating the flow or calling support.*
+
+![Landing page — features](frontend/screenshots/landing_page_3.png)
+*Live agent activity log, "finds what you forgot" data connectors, and ranks by actual impact — usage signals, seat counts, and regret-risk.*
+
+---
+
+### Onboarding (8 steps)
+
+![Onboarding step 1 — welcome](frontend/screenshots/onboarding_1.png)
+*Step 1: Welcome screen — outlines the three-step process: connect data sources, review AI recommendations, approve or let Ottofii execute.*
+
+![Onboarding step 2 — company info](frontend/screenshots/onboarding_2.png)
+*Step 2: Company profile — name, industry, and size so Ottofii can tailor recommendations to your scale.*
+
+![Onboarding step 3 — create account](frontend/screenshots/onboarding_3.png)
+*Step 3: Account creation — name and work email. Any values work for the demo.*
+
+![Onboarding step 4 — connect data sources (OAuth)](frontend/screenshots/onboarding_4.png)
+*Step 4: Connect data sources — Gmail, Slack, Bank/Cards, CSV upload, or QuickBooks. OAuth permission prompt shown for Gmail.*
+
+![Onboarding step 4 — data sources connected](frontend/screenshots/onboarding_5.png)
+*Step 4 (continued): Gmail and Bank/Cards connected. At least one source required; more can be added later.*
+
+![Onboarding step 5 — analysis complete](frontend/screenshots/onboarding_6.png)
+*Step 5: Analysis complete — Ottofii found 13 recurring subscriptions across connected sources.*
+
+![Onboarding step 6 — goals](frontend/screenshots/onboarding_7.png)
+*Step 6: Goals selection — Reduce SaaS spend, Eliminate unused tools, Renegotiate contracts, Consolidate vendors. Ottofii prioritizes recommendations accordingly.*
+
+![Onboarding step 7 — agent mode](frontend/screenshots/onboarding_8.png)
+*Step 7: Agent mode — Safe mode (you approve every action) vs. Autonomous mode (Ottofii executes within policy, you review the audit log). Legal contracts, payroll, and tax obligations are always protected.*
+
+![Onboarding step 8 — all set](frontend/screenshots/onboarding_9.png)
+*Step 8: Setup complete — company, sources connected, goals, and agent mode confirmed. Ready to view the dashboard.*
+
+---
+
 ### 1. Spend Dashboard
 
 The dashboard gives a real-time view of all detected subscriptions, their billing cadence, seat count, usage levels, and Otto's confidence in each detection.
@@ -155,9 +199,32 @@ We split the system into four ownership layers with strict API contracts defined
 
 ## What's Next
 
-- **Real data connectors:** OAuth integrations with Gmail and Plaid to replace mock data with live transactions and email receipts.
-- **Free trial watcher:** Detect trial start dates and auto-cancel before the first charge hits.
-- **Individual tier:** The same engine applied to personal subscriptions.
+> Moving from insight → execution platform. The goal is an autonomous agent for spend optimization, not just a dashboard.
+
+### 1. Data Connectors
+
+- **Live financial integrations** — OAuth with Gmail and Plaid to ingest real transactions and email receipts
+- **Enterprise ingestion** — ERP, invoicing, and accounting system integrations; replace demo data with real workflows
+- **B2B expansion** — Target enterprise SaaS spend (10–100× consumer scale) with signals like team size, revenue, and usage patterns
+
+### 2. Data Analysis & Intelligence
+
+- **Advanced ingestion pipelines** — Structured parsing of transactions, invoices, and subscription signals
+- **Predictive waste detection** — Replace heuristics with real usage signals (e.g., flag inactivity after 30+ days of no logins)
+- **Sharper deterministic pre-scoring** — Cleanly separate deterministic logic (spend, frequency, savings rank) from LLM reasoning (context, recommendations) to reduce hallucinations further
+
+### 3. Agent Actions
+
+- **IntelliNegotiation** — AI-driven contract renegotiation via email or voice agents
+- **Smart downsizing** — Recommend plan downgrades, not just outright cancellations
+- **Free trial watcher** — Detect trial start dates and notify or auto-cancel before the first charge hits
+- **Auto mode (premium)** — Automatically cancel unused subscriptions after a configurable inactivity threshold
+- **Contract renewal management** — Track renewal dates and surface cost-per-use metrics before auto-renewals trigger
+
+### 4. Verification & Reliability
+
+- **Anti-fragile execution** — Hybrid automation (APIs + browser + email flows) resilient to vendor UI and API changes
+- **Full audit trails** — Logs, confirmation IDs, and screenshots for every action taken
 
 ---
 
@@ -174,6 +241,17 @@ We split the system into four ownership layers with strict API contracts defined
 | Voice Agent | ElevenLabs Conversational AI + Twilio |
 
 **Built with:** `python` `next.js` `supabase` `sqlalchemy` `typescript` `react` `fastapi` `postgresql` `openai` `gemini` `elevenlabs` `twilio` `playwright`
+
+---
+
+## Contributors
+
+| | Name | School | GitHub |
+|---|------|--------|--------|
+| | **Kasuti Makau** | Dartmouth College | [@EKasuti](https://github.com/EKasuti) |
+| | **Dickson Alexander** | Dartmouth College | [@Dickson-Alexander](https://github.com/Dickson-Alexander) |
+| | **Jake Tran** | Brown University | [@jjjakettt](https://github.com/jjjakettt) |
+| | **Lynn Lin** | Brown University | [@lynnlin77](https://github.com/lynnlin77) |
 
 ---
 
