@@ -10,7 +10,6 @@ You will be given a list of pre-scored subscription streams and a user goal. Eac
 You must output a JSON object that strictly follows the schema below.
 
 Rules:
-- Each stream_id must appear in exactly ONE action. If a stream qualifies for multiple action types, pick the one with the highest monthly savings impact and discard the rest
 - Only recommend actions where there is clear evidence of waste (low/no usage, duplicates, or negotiation opportunity)
 - Respect the `regret_risk_hint` — only override it if notes/usage clearly justify a different risk level
 - Rank actions by `savings_score` descending as a primary signal, adjusted by confidence (rank 1 = best)

@@ -10,11 +10,69 @@ from google import genai as genai_client
 from config import OPENAI_API_KEY, GOOGLE_GEMINI_API_KEY
 from schemas import ActionItem, ActionPlan, Evidence, RecurringStream, SkippedStream, Strategy
 from agent.prompt import SYSTEM_PROMPT, build_user_prompt
-from agent.validators import pre_score, deduplicate_actions
 from stubs import STUB_STREAMS
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 gemini = genai_client.Client(api_key=GOOGLE_GEMINI_API_KEY)
+
+_REGRET_RISK_MAP = {
+    "active": "high",
+    "low": "medium",
+    "none": "low",
+    "unknown": "medium",
+}
+
+
+def pre_score(streams: list[RecurringStream]) -> tuple[list[dict], list[dict]]:
+    """
+    Compute deterministic scores for each stream before sending to LLM.
+    Returns (scoreable, skipped) where each item is a dict ready for the prompt.
+    """
+    # Monthly equivalent for annual/quarterly streams
+    def monthly_equiv(s: RecurringStream) -> float:
+        if s.cadence == "annual":
+            return s.amount_usd / 12
+        if s.cadence == "quarterly":
+            return s.amount_usd / 3
+        return s.amount_usd
+
+    amounts = [monthly_equiv(s) for s in streams]
+    max_amount = max(amounts) if amounts else 1.0
+
+    scoreable = []
+    skipped = []
+
+    for s, monthly_usd in zip(streams, amounts):
+        if s.is_protected:
+            skipped.append({
+                "stream_id": s.id,
+                "merchant": s.merchant,
+                "reason": "Stream is protected — do not action.",
+            })
+            continue
+
+        regret_risk = _REGRET_RISK_MAP.get(s.usage_signal, "medium")
+        savings_score = round(monthly_usd / max_amount, 3)  # 0.0–1.0
+
+        scoreable.append({
+            "stream_id": s.id,
+            "merchant": s.merchant,
+            "category": s.category,
+            "cadence": s.cadence,
+            "amount_usd": s.amount_usd,
+            "monthly_equivalent_usd": round(monthly_usd, 2),
+            "seat_count": s.seat_count,
+            "usage_signal": s.usage_signal,
+            "confidence": s.confidence,
+            "regret_risk_hint": regret_risk,   # LLM should use this unless evidence overrides
+            "savings_score": savings_score,     # relative rank signal
+            "notes": s.notes,
+            "first_seen": s.first_seen,
+            "last_seen": s.last_seen,
+            "occurrence_count": s.occurrence_count,
+        })
+
+    return scoreable, skipped
 
 
 async def fetch_streams() -> list[RecurringStream]:
@@ -117,10 +175,9 @@ async def build_plan(user_goal: str) -> ActionPlan:
 
         valid_actions.append(action)
 
-    # Deduplicate: one action per stream_id, re-ranked by savings descending
-    actions = deduplicate_actions(valid_actions)
+    actions = valid_actions
 
-    # Empty plan guard
+    # Check 4: empty plan guard
     if not actions:
         raise HTTPException(
             status_code=400,
@@ -141,6 +198,6 @@ async def build_plan(user_goal: str) -> ActionPlan:
         user_goal=user_goal,
         total_monthly_savings_usd=round(total_monthly, 2),
         total_annual_savings_usd=round(total_annual, 2),
-        actions=actions,
+        actions=sorted(actions, key=lambda a: a.rank),
         skipped=skipped,
     )
