@@ -17,5 +17,9 @@ export function formatEvidencePrimaryLine(ev: ActionEvidence): string | null {
     if (getScreenshotDataUrl(ev.payload)) return "Screenshot captured";
     if (ev.payload.path) return ev.payload.path;
   }
+  if (ev.type === "browser_failure" && ev.payload.error) return ev.payload.error;
+  if (ev.type === "call_transcript") {
+    return ev.payload.contact_name ?? ev.payload.transcript_text?.slice(0, 80) ?? null;
+  }
   return null;
 }

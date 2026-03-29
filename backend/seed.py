@@ -8,15 +8,26 @@ import uuid
 from datetime import datetime
 from sqlalchemy.orm import Session
 from database import SessionLocal
-from models import User, Connection, RecurringStream
+from models import User, Connection, RecurringStream, Recommendation, ActionPlan, Action, ActionEvidence
 from seed_data import RECURRING_STREAMS, DEMO_ORG_ID, DEMO_USER_ID
 
 
 def reset_db(db: Session):
     print("Resetting seed data...")
-    db.query(RecurringStream).filter(RecurringStream.org_id == DEMO_ORG_ID).delete()
-    db.query(Connection).filter(Connection.org_id == DEMO_ORG_ID).delete()
-    db.query(User).filter(User.id == DEMO_USER_ID).delete()
+    # Delete in FK dependency order
+    rec_ids = [r.id for r in db.query(Recommendation.id).filter(Recommendation.org_id == DEMO_ORG_ID)]
+    if rec_ids:
+        db.query(ActionEvidence).filter(
+            ActionEvidence.action_id.in_(
+                db.query(Action.id).filter(Action.recommendation_id.in_(rec_ids))
+            )
+        ).delete(synchronize_session=False)
+        db.query(Action).filter(Action.recommendation_id.in_(rec_ids)).delete(synchronize_session=False)
+    db.query(Recommendation).filter(Recommendation.org_id == DEMO_ORG_ID).delete(synchronize_session=False)
+    db.query(ActionPlan).filter(ActionPlan.org_id == DEMO_ORG_ID).delete(synchronize_session=False)
+    db.query(RecurringStream).filter(RecurringStream.org_id == DEMO_ORG_ID).delete(synchronize_session=False)
+    db.query(Connection).filter(Connection.org_id == DEMO_ORG_ID).delete(synchronize_session=False)
+    db.query(User).filter(User.id == DEMO_USER_ID).delete(synchronize_session=False)
     db.commit()
     print("Reset complete.")
 
@@ -27,7 +38,7 @@ def seed_user(db: Session):
         return existing
     user = User(
         id=DEMO_USER_ID,
-        email="demo@ottofii.com",
+        email="jason@acme.org",
         org_id=DEMO_ORG_ID,
         role="cfo",
         created_at=datetime.utcnow(),

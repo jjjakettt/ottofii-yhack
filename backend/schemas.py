@@ -47,6 +47,7 @@ class Channel(str, Enum):
     browser = "browser"
     email = "email"
     api = "api"
+    phone = "phone"
 
 
 # ─────────────────────────────────────────────

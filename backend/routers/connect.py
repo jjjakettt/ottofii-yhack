@@ -11,6 +11,7 @@ from database import get_db
 from models import Connection
 from schemas import ConnectRequest, ConnectResponse
 from seed import seed_streams, seed_user
+from seed_data import DEMO_USER_ID
 
 router = APIRouter()
 
@@ -32,7 +33,7 @@ def connect_mock(request: ConnectRequest, db: Session = Depends(get_db)):
     connection_id = f"conn_{request.source}_{uuid.uuid4().hex[:8]}"
     conn = Connection(
         id=connection_id,
-        user_id="user_demo",
+        user_id=DEMO_USER_ID,
         org_id="org_demo",
         type=request.source,
         status="active",

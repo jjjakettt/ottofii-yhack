@@ -5,7 +5,7 @@ Canonical seed data for hackathon demo.
 from datetime import date
 
 DEMO_ORG_ID = "org_demo"
-DEMO_USER_ID = "user_demo"
+DEMO_USER_ID = "Acme Corp"
 
 RECURRING_STREAMS = [
     {

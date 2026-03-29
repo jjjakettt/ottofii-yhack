@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config/api";
+import { DEMO_USER_ID } from "@/lib/demo-account";
 import type { ActionPlan, ConfirmResponse, RejectResponse, ExecuteResponse, RecommendationsResponse } from "@/types";
 
 // POST /agent/plan
@@ -15,7 +16,7 @@ export async function getActionPlan(userGoal = "Reduce my monthly spend"): Promi
 // POST /agent/confirm
 export async function confirmAction(
   recommendationId: string,
-  approvedBy = "user_demo"
+  approvedBy = DEMO_USER_ID
 ): Promise<ConfirmResponse> {
   const res = await fetch(`${API_BASE_URL}/agent/confirm`, {
     method: "POST",
@@ -26,10 +27,20 @@ export async function confirmAction(
   return res.json();
 }
 
+// POST /agent/restore
+export async function restoreRecommendation(recommendationId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/agent/restore`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recommendation_id: recommendationId, rejected_by: "user_demo" }),
+  });
+  if (!res.ok) throw new Error(`POST /agent/restore failed: ${res.status}`);
+}
+
 // POST /agent/reject
 export async function rejectAction(
   recommendationId: string,
-  rejectedBy = "user_demo"
+  rejectedBy = DEMO_USER_ID
 ): Promise<RejectResponse> {
   const res = await fetch(`${API_BASE_URL}/agent/reject`, {
     method: "POST",
@@ -55,5 +66,23 @@ export async function executeAction(actionId: string): Promise<ExecuteResponse> 
     body: JSON.stringify({ action_id: actionId }),
   });
   if (!res.ok) throw new Error(`POST /agent/execute failed: ${res.status}`);
+  return res.json();
+}
+
+// POST /actions/{action_id}/retry
+export async function retryAction(actionId: string): Promise<ExecuteResponse> {
+  const res = await fetch(`${API_BASE_URL}/actions/${actionId}/retry`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`POST /actions/${actionId}/retry failed: ${res.status}`);
+  return res.json();
+}
+
+// POST /actions/{action_id}/cancel
+export async function cancelAction(actionId: string): Promise<ExecuteResponse> {
+  const res = await fetch(`${API_BASE_URL}/actions/${actionId}/cancel`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`POST /actions/${actionId}/cancel failed: ${res.status}`);
   return res.json();
 }

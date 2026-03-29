@@ -149,3 +149,21 @@ def agent_reject(req: RejectRequest, db: Session = Depends(get_db)):
     db.commit()
 
     return RejectResponse(recommendation_id=req.recommendation_id, status="rejected")
+
+
+@router.post("/restore")
+def agent_restore(req: RejectRequest, db: Session = Depends(get_db)):
+    rec = db.query(Recommendation).filter(
+        Recommendation.id == req.recommendation_id
+    ).first()
+
+    if not rec:
+        raise HTTPException(status_code=404, detail="recommendation_id not found")
+
+    if rec.status != "rejected":
+        raise HTTPException(status_code=409, detail=f"Recommendation is not rejected (status: {rec.status})")
+
+    rec.status = "pending"
+    db.commit()
+
+    return {"recommendation_id": req.recommendation_id, "status": "pending"}

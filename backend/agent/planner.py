@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
@@ -7,13 +8,16 @@ import httpx
 from openai import OpenAI
 from google import genai as genai_client
 
-from config import OPENAI_API_KEY, GOOGLE_GEMINI_API_KEY
+from config import OPENAI_API_KEY, GOOGLE_GEMINI_API_KEY, OPENAI_PLAN_MODEL
 from schemas import ActionItem, ActionPlan, Evidence, RecurringStream, SkippedStream, Strategy
 from agent.prompt import SYSTEM_PROMPT, build_user_prompt
 from agent.validators import pre_score, deduplicate_actions
 from stubs import STUB_STREAMS
 
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+openai_client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    timeout=httpx.Timeout(45.0, connect=5.0),
+)
 gemini = genai_client.Client(api_key=GOOGLE_GEMINI_API_KEY)
 
 _REGRET_RISK_MAP = {
@@ -89,7 +93,7 @@ async def fetch_streams() -> list[RecurringStream]:
 
 def _call_openai(system: str, user: str) -> dict:
     response = openai_client.chat.completions.create(
-        model="gpt-4o",
+        model=OPENAI_PLAN_MODEL,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system},
@@ -145,7 +149,8 @@ async def build_plan(user_goal: str) -> ActionPlan:
     scoreable, pre_skipped = pre_score(streams)
 
     user_prompt = build_user_prompt(scoreable, user_goal)
-    raw = _call_llm(SYSTEM_PROMPT, user_prompt)
+    # Run sync LLM calls off the event loop so other requests stay responsive.
+    raw = await asyncio.to_thread(_call_llm, SYSTEM_PROMPT, user_prompt)
 
     # Build lookup maps from pre-scored data
     valid_stream_ids = {s["stream_id"] for s in scoreable}

@@ -1,0 +1,18 @@
+export const VOICE_AGENT_NAME = "Otto";
+
+export function stripEmotionTags(text: string): string {
+  return text.replace(/\[[^\]]+\]\s*/g, "").trim();
+}
+
+/** Formats E.164-ish numbers for readable UI. */
+export function formatPhoneForDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) {
+    const rest = digits.slice(1);
+    return `+1 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return phone;
+}

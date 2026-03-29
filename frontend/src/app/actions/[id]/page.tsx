@@ -15,20 +15,232 @@ import {
   MinusCircle,
   MessageSquare,
   ArrowRightLeft,
+  Phone,
+  AlertTriangle,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { AppHeader } from "@/components/app-header";
 import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
+import { useQueryClient } from "@tanstack/react-query";
+import { cancelAction, retryAction } from "@/apis/agent";
+import {
+  formatPhoneForDisplay,
+  stripEmotionTags,
+  VOICE_AGENT_NAME,
+} from "@/lib/call-transcript";
 import { formatEvidencePrimaryLine, getScreenshotDataUrl } from "@/lib/evidence-display";
 import { cn } from "@/lib/utils";
 import type { ActionEvidence, ActionStatus as ActionStatusType, ActionType } from "@/types";
 
+function CallTranscriptEvidence({
+  ev,
+  title,
+}: {
+  ev: Extract<ActionEvidence, { type: "call_transcript" }>;
+  title: string;
+}) {
+  const [conversationOpen, setConversationOpen] = useState(false);
+  const transcript: Array<{ role: string; message: string }> =
+    ev.payload.transcript ?? [];
+  const agentName = ev.payload.voice_agent_name ?? VOICE_AGENT_NAME;
+  const accountHolder = ev.payload.account_holder;
+  const accountPhone = ev.payload.account_phone;
+  const merchant = ev.payload.subscription_merchant;
+
+  const turnCount =
+    transcript.length > 0
+      ? transcript.length
+      : ev.payload.transcript_text
+        ? Math.max(1, ev.payload.transcript_text.split("\n").filter(Boolean).length)
+        : 0;
+
+  return (
+    <div className="p-4 sm:p-5">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border bg-muted/50 px-4 py-3 sm:px-5">
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+            {agentName} is the voice agent on this call.{" "}
+            <span className="text-foreground/90">
+              Account holder and phone number are taken from the backend demo profile and sent to ElevenLabs as
+              dynamic variables (the same values as{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">full_name</code> and{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">phone_number</code> in your
+              agent prompt).
+            </span>
+          </p>
+        </div>
+
+        {(accountHolder != null || accountPhone != null || merchant != null) && (
+          <div className="grid gap-3 border-b border-border px-4 py-3 sm:grid-cols-3 sm:px-5">
+            {accountHolder != null && (
+              <div className="space-y-0.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Account holder
+                </div>
+                <div className="text-sm font-medium text-foreground">{accountHolder}</div>
+              </div>
+            )}
+            {accountPhone != null && (
+              <div className="space-y-0.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Phone on file
+                </div>
+                <div className="font-mono text-sm text-foreground">{formatPhoneForDisplay(accountPhone)}</div>
+              </div>
+            )}
+            {merchant != null && (
+              <div className="space-y-0.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Subscription
+                </div>
+                <div className="text-sm font-medium text-foreground">{merchant}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="border-b border-border px-4 py-3 sm:px-5">
+          <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Vendor line
+          </div>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+            <span className="font-medium text-foreground">{ev.payload.contact_name}</span>
+            <span className="font-mono text-muted-foreground">{ev.payload.contact_phone}</span>
+          </div>
+        </div>
+
+        {ev.payload.confirmation_number != null && String(ev.payload.confirmation_number).trim() !== "" && (
+          <div className="border-b border-border px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
+              <FileCheck className="h-4 w-4 shrink-0 text-success" />
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Confirmation number
+                </div>
+                <div className="font-mono text-base font-semibold tabular-nums text-foreground">
+                  {ev.payload.confirmation_number}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Collapsible
+          open={conversationOpen}
+          onOpenChange={setConversationOpen}
+          className="bg-muted/20"
+        >
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted/40 sm:px-5"
+            >
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Conversation
+                </div>
+                <div className="text-sm font-medium text-foreground">
+                  {turnCount > 0 ? `${turnCount} turn${turnCount === 1 ? "" : "s"}` : "Transcript"}
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {conversationOpen ? "Hide" : "Show"} full transcript
+                  </span>
+                </div>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
+                  conversationOpen && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-3 pb-4 pt-1 sm:px-4">
+              {transcript.length > 0 ? (
+                <div className="space-y-3">
+                  {transcript.map((turn, i) => {
+                    const isAgent = turn.role === "agent";
+                    const body = stripEmotionTags(String(turn.message ?? ""));
+                    const label = isAgent ? agentName : "Support";
+                    const initial = isAgent ? agentName.charAt(0) : "S";
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          "flex gap-3",
+                          isAgent ? "flex-row" : "flex-row-reverse",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                            isAgent
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-secondary text-secondary-foreground",
+                          )}
+                          aria-hidden
+                        >
+                          {initial}
+                        </div>
+                        <div
+                          className={cn(
+                            "max-w-[min(100%,28rem)] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                            isAgent
+                              ? "rounded-tl-sm border border-primary/20 bg-primary/10 text-foreground"
+                              : "rounded-tr-sm border border-border bg-background text-foreground",
+                          )}
+                        >
+                          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {label}
+                          </div>
+                          <p className="whitespace-pre-wrap break-words">{body}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : ev.payload.transcript_text ? (
+                <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-background p-4 font-sans text-sm text-foreground">
+                  {stripEmotionTags(ev.payload.transcript_text)}
+                </pre>
+              ) : (
+                <p className="text-sm text-muted-foreground">No transcript lines returned.</p>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    </div>
+  );
+}
+
 function agentStepMessages(
   actionType: ActionType,
-  merchant: string
+  merchant: string,
+  channel?: string,
 ): string[] {
   const m = merchant;
+
+  if (channel === "phone") {
+    return [
+      `Browser automation unavailable for ${m}…`,
+      "Initiating phone call via Otto…",
+      "Otto connected — requesting cancellation…",
+      "Declining retention offers…",
+      "Awaiting confirmation number…",
+    ];
+  }
+
   switch (actionType) {
     case "cancel":
       return [
@@ -73,14 +285,16 @@ function AgentExecutionSteps({
   active,
   actionType,
   merchant,
+  channel,
 }: {
   active: boolean;
   actionType: ActionType;
   merchant: string;
+  channel?: string;
 }) {
   const steps = useMemo(
-    () => agentStepMessages(actionType, merchant),
-    [actionType, merchant]
+    () => agentStepMessages(actionType, merchant, channel),
+    [actionType, merchant, channel]
   );
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -161,12 +375,123 @@ function formatDateTime(iso: string | null): string {
 function EvidenceBlock({ ev }: { ev: ActionEvidence }) {
   const screenshotSrc =
     ev.type === "screenshot" ? getScreenshotDataUrl(ev.payload) : null;
-  const title =
-    ev.type === "confirmation_id"
-      ? "Confirmation ID"
-      : ev.type === "email"
-        ? "Email"
-        : "Screenshot";
+
+  const titleMap: Record<string, string> = {
+    confirmation_id: "Confirmation ID",
+    email: "Email",
+    screenshot: "Screenshot",
+    call_transcript: "Phone cancellation",
+    browser_failure: "Browser Automation Failed",
+    execution_cancelled: "Execution Stopped",
+    phone_attempt: "Phone Attempt",
+    phone_retry_scheduled: "Next call scheduled",
+  };
+  const title = titleMap[ev.type] ?? ev.type;
+
+  if (ev.type === "execution_cancelled") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-muted/50">
+            <CancelIcon className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="text-sm font-medium">{title}</div>
+            <p className="text-sm text-muted-foreground">
+              You stopped this run. You can retry when you are ready.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === "phone_retry_scheduled") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-primary/30 bg-primary/10">
+            <Phone className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="text-sm font-medium">{title}</div>
+            {ev.payload.message != null && (
+              <p className="text-sm text-muted-foreground">{String(ev.payload.message)}</p>
+            )}
+            <p className="text-sm text-foreground">
+              Another attempt will run automatically in about{" "}
+              <span className="font-medium">{ev.payload.retry_window_minutes ?? "1–2"} minutes</span>
+              {ev.payload.next_contact_name != null && (
+                <>
+                  {" "}
+                  (next: <span className="font-medium">{ev.payload.next_contact_name}</span>
+                  {ev.payload.next_contact_phone != null && (
+                    <span className="font-mono text-muted-foreground">
+                      {" "}
+                      · {String(ev.payload.next_contact_phone)}
+                    </span>
+                  )}
+                  ).
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === "phone_attempt") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-warning/30 bg-warning/10">
+            <Phone className="h-5 w-5 text-warning" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="text-sm font-medium">{title}</div>
+            <p className="text-xs text-muted-foreground">
+              {ev.payload.contact_name != null && (
+                <>
+                  <span className="font-medium text-foreground">{String(ev.payload.contact_name)}</span>
+                  {" · "}
+                </>
+              )}
+              <span className="font-mono">{String(ev.payload.contact_phone ?? "")}</span>
+            </p>
+            {ev.payload.error != null && (
+              <p className="text-sm text-muted-foreground">{String(ev.payload.error)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === "browser_failure") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-warning/30 bg-warning/10">
+            <AlertTriangle className="h-5 w-5 text-warning" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="text-sm font-medium">{title}</div>
+            <p className="text-sm text-muted-foreground">{ev.payload.error}</p>
+            {ev.payload.fallback && (
+              <p className="text-xs text-muted-foreground">
+                Fallback: <span className="font-medium text-foreground capitalize">{ev.payload.fallback} call</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === "call_transcript") {
+    return <CallTranscriptEvidence ev={ev} title={title} />;
+  }
 
   return (
     <div className="p-4">
@@ -342,6 +667,10 @@ export default function ActionStatusPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
   const { action, isLoading, error } = useAction(id);
+  const queryClient = useQueryClient();
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
   if (isLoading) {
     return <AppLoading message="Loading action…" />;
   }
@@ -361,6 +690,26 @@ export default function ActionStatusPage() {
         </main>
       </div>
     );
+  }
+
+  async function handleRetry() {
+    setIsRetrying(true);
+    try {
+      await retryAction(id);
+      queryClient.invalidateQueries({ queryKey: ["action", id] });
+    } finally {
+      setIsRetrying(false);
+    }
+  }
+
+  async function handleCancel() {
+    setIsCancelling(true);
+    try {
+      await cancelAction(id);
+      queryClient.invalidateQueries({ queryKey: ["action", id] });
+    } finally {
+      setIsCancelling(false);
+    }
   }
 
   const statusInfo = statusConfig[action.status];
@@ -428,8 +777,30 @@ export default function ActionStatusPage() {
               active={action.status === "executing"}
               actionType={action.action_type}
               merchant={action.merchant}
+              channel={action.channel}
             />
 
+            {action.status === "executing" && (
+              <div className="border-b border-border px-6 py-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 sm:w-auto"
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  Stop and mark failed
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Use this if the call is stuck (e.g. no answer) and you want to stop or try again later.
+                </p>
+              </div>
+            )}
 
             <div className="border-b border-border p-6">
               <div className="mb-4 text-sm font-medium text-muted-foreground">
@@ -456,7 +827,7 @@ export default function ActionStatusPage() {
             </div>
           </div>
 
-          {action.status === "succeeded" && action.evidence.length > 0 && (
+          {(action.status === "succeeded" || action.status === "failed") && action.evidence.length > 0 && (
             <div className="border border-border bg-card">
               <div className="border-b border-border px-6 py-4">
                 <h2 className="font-medium">Proof of Completion</h2>
@@ -474,10 +845,19 @@ export default function ActionStatusPage() {
 
           {terminal && (
             <div className="flex justify-center gap-3">
+              {action.status === "failed" && (
+                <Button onClick={handleRetry} disabled={isRetrying} className="gap-2">
+                  {isRetrying
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <RefreshCw className="h-4 w-4" />
+                  }
+                  Retry
+                </Button>
+              )}
               <Button variant="outline" asChild>
                 <Link href="/dashboard">View Dashboard</Link>
               </Button>
-              <Button asChild>
+              <Button variant={action.status === "failed" ? "outline" : "default"} asChild>
                 <Link href="/recommendations">More Recommendations</Link>
               </Button>
             </div>
