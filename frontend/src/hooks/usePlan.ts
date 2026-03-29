@@ -23,8 +23,6 @@ export const usePlan = (userGoal?: string) => {
   const query = useQuery<ActionPlan>({
     queryKey: planKey(userGoal),
     queryFn: () => getActionPlan(userGoal),
-    staleTime: 5 * 60 * 1000,
-    placeholderData: (prev) => prev,
   });
 
   return {

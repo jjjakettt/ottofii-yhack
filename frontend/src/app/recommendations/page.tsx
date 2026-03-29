@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -11,13 +11,16 @@ import {
   Info,
   Check,
   ChevronDown,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
 import { AppLoading } from "@/components/app-loading";
-import { usePlan, useConfirmAction } from "@/hooks/usePlan";
+import { useRecommendations, useConfirmAction, useGeneratePlan } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
-import type { ActionItem } from "@/types";
+import type { RecommendationItem } from "@/types";
+
+type StatusFilter = "pending" | "completed" | "all";
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -42,23 +45,24 @@ const regretRiskConfig = {
 };
 
 function RecommendationCard({
-  action,
+  recommendation,
   onApprove,
   isApproving,
 }: {
-  action: ActionItem;
+  recommendation: RecommendationItem;
   onApprove: () => void;
   isApproving: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const actionConfig = actionTypeConfig[action.action_type];
+  const actionConfig = actionTypeConfig[recommendation.action_type];
   const ActionIcon = actionConfig.icon;
-  const riskConfig = regretRiskConfig[action.regret_risk];
-  const ev = action.evidence;
+  const riskConfig = regretRiskConfig[recommendation.regret_risk];
+  const ev = recommendation.evidence;
   const dupes = ev.duplicate_tools ?? [];
+  const isCompleted = recommendation.status === "completed";
 
   return (
-    <div className="border border-border bg-card">
+    <div className={cn("border border-border bg-card", isCompleted && "opacity-60")}>
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -72,16 +76,20 @@ function RecommendationCard({
           <div
             className={cn(
               "flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-background",
-              actionConfig.className
+              isCompleted ? "text-success" : actionConfig.className
             )}
           >
-            <ActionIcon className="h-5 w-5" />
+            {isCompleted ? (
+              <CheckCircle2 className="h-5 w-5" />
+            ) : (
+              <ActionIcon className="h-5 w-5" />
+            )}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold">{action.merchant}</span>
-              <span className={cn("text-xs font-medium uppercase", actionConfig.className)}>
-                {actionConfig.label}
+              <span className="font-semibold">{recommendation.merchant}</span>
+              <span className={cn("text-xs font-medium uppercase", isCompleted ? "text-success" : actionConfig.className)}>
+                {isCompleted ? "Completed" : actionConfig.label}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
@@ -89,7 +97,7 @@ function RecommendationCard({
               <span>
                 Confidence:{" "}
                 <span className="font-mono tabular-nums">
-                  {(action.confidence * 100).toFixed(0)}%
+                  {(recommendation.confidence * 100).toFixed(0)}%
                 </span>
               </span>
             </div>
@@ -98,11 +106,11 @@ function RecommendationCard({
         <div className="flex shrink-0 items-start gap-2">
           <div className="text-right">
             <div className="font-mono text-xl font-semibold tabular-nums text-success">
-              {formatCurrency(action.monthly_savings_usd)}
+              {formatCurrency(recommendation.monthly_savings_usd)}
               <span className="text-sm font-normal text-muted-foreground">/mo</span>
             </div>
             <div className="text-xs text-muted-foreground">
-              {formatCurrency(action.annual_savings_usd)}/yr
+              {formatCurrency(recommendation.annual_savings_usd)}/yr
             </div>
           </div>
           <ChevronDown
@@ -118,7 +126,7 @@ function RecommendationCard({
       {expanded && (
         <>
           <div className="border-b border-border p-4">
-            <p className="text-sm text-foreground">{action.explanation}</p>
+            <p className="text-sm text-foreground">{recommendation.explanation}</p>
           </div>
 
           <div className="border-b border-border p-4">
@@ -170,23 +178,49 @@ function RecommendationCard({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 p-4">
-            <Button size="sm" onClick={onApprove} disabled={isApproving} className="gap-1.5">
-              {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Approve
-            </Button>
-          </div>
+          {!isCompleted && (
+            <div className="flex items-center justify-end gap-2 p-4">
+              <Button size="sm" onClick={onApprove} disabled={isApproving} className="gap-1.5">
+                {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Approve
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
+const FILTERS: { label: string; value: StatusFilter }[] = [
+  { label: "Pending", value: "pending" },
+  { label: "Completed", value: "completed" },
+  { label: "All", value: "all" },
+];
+
 export default function RecommendationsPage() {
   const router = useRouter();
-  const { plan, isLoading, isFetching } = usePlan();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
+  const { recommendations, totalMonthlySavings, totalAnnualSavings, isLoading } =
+    useRecommendations(statusFilter);
   const confirm = useConfirmAction();
+  const generate = useGeneratePlan();
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const autoGeneratedRef = useRef(false);
+
+  // Auto-generate on first load if no pending recommendations exist
+  useEffect(() => {
+    if (
+      !isLoading &&
+      statusFilter === "pending" &&
+      recommendations.length === 0 &&
+      !autoGeneratedRef.current &&
+      !generate.isPending
+    ) {
+      autoGeneratedRef.current = true;
+      generate.mutate();
+    }
+  }, [isLoading, statusFilter, recommendations.length, generate]);
 
   async function handleApprove(recommendationId: string) {
     setApprovingId(recommendationId);
@@ -198,20 +232,17 @@ export default function RecommendationsPage() {
     }
   }
 
-  if (isLoading) {
-    return <AppLoading message="Generating recommendations…" />;
+  if (isLoading || generate.isPending) {
+    return (
+      <AppLoading
+        message={generate.isPending ? "Generating recommendations…" : "Loading recommendations…"}
+      />
+    );
   }
 
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
-
-      {isFetching && plan && (
-        <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-6 py-2 text-sm text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Refreshing recommendations…
-        </div>
-      )}
 
       <main className="flex-1 px-6 py-6">
         <div className="mx-auto max-w-4xl space-y-6">
@@ -222,34 +253,57 @@ export default function RecommendationsPage() {
                 AI-generated actions to reduce your SaaS spend
               </p>
             </div>
-            {plan && (
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground">Savings Potential</div>
-                <div className="font-mono text-2xl font-semibold tabular-nums text-success">
-                  {formatCurrency(plan.total_monthly_savings_usd)}
-                  <span className="text-sm font-normal text-muted-foreground">/mo</span>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {formatCurrency(plan.total_annual_savings_usd)} annually
-                </div>
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">Savings Potential</div>
+              <div className="font-mono text-2xl font-semibold tabular-nums text-success">
+                {formatCurrency(totalMonthlySavings)}
+                <span className="text-sm font-normal text-muted-foreground">/mo</span>
               </div>
-            )}
+              <div className="text-sm text-muted-foreground">
+                {formatCurrency(totalAnnualSavings)} annually
+              </div>
+            </div>
           </div>
 
-          {plan && plan.actions.length > 0 ? (
+          {/* Filter tabs */}
+          <div className="flex gap-1 border-b border-border">
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setStatusFilter(f.value)}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors rounded-t-sm cursor-pointer",
+                  statusFilter === f.value
+                    ? "border-b-2 border-primary text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {recommendations.length > 0 ? (
             <div className="space-y-4">
-              {plan.actions.map((action) => (
+              {recommendations.map((rec) => (
                 <RecommendationCard
-                  key={action.recommendation_id}
-                  action={action}
-                  onApprove={() => handleApprove(action.recommendation_id)}
-                  isApproving={approvingId === action.recommendation_id}
+                  key={rec.recommendation_id}
+                  recommendation={rec}
+                  onApprove={() => handleApprove(rec.recommendation_id)}
+                  isApproving={approvingId === rec.recommendation_id}
                 />
               ))}
             </div>
           ) : (
             <div className="border border-border bg-card p-8 text-center">
-              <p className="text-muted-foreground">No recommendations found</p>
+              <p className="text-muted-foreground">
+                {statusFilter === "pending"
+                  ? "No pending recommendations"
+                  : statusFilter === "completed"
+                  ? "No completed actions yet"
+                  : "No recommendations found"}
+              </p>
             </div>
           )}
         </div>
