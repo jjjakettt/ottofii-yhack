@@ -125,14 +125,18 @@ async def poll_call_until_done(
             if action_id and is_cancelled(action_id):
                 raise RuntimeError("Execution cancelled")
 
-            resp = await client.get(
-                f"{_BASE}/convai/conversations/{conversation_id}",
-                headers={"xi-api-key": ELEVENLABS_API_KEY},
-                timeout=10.0,
-            )
-
             try:
+                resp = await client.get(
+                    f"{_BASE}/convai/conversations/{conversation_id}",
+                    headers={"xi-api-key": ELEVENLABS_API_KEY},
+                    timeout=30.0,
+                )
                 resp.raise_for_status()
+            except httpx.TimeoutException:
+                logger.warning("[ElevenLabs] Poll request timed out at %.0fs — retrying", elapsed)
+                await asyncio.sleep(poll_interval_s)
+                elapsed += poll_interval_s
+                continue
             except httpx.HTTPStatusError as e:
                 raise RuntimeError(
                     f"ElevenLabs status poll failed ({resp.status_code}): {resp.text}"
