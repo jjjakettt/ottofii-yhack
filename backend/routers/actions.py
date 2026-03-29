@@ -270,7 +270,14 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
                 logger.info("[execution] Cancellation confirmed with %s — done", contact["name"])
 
                 transcript_text = format_transcript(transcript)
-                confirmation_number = extract_confirmation_number_from_transcript(transcript)
+                # Prefer ElevenLabs structured data collection over regex
+                analysis = conv_data.get("analysis") or {}
+                data_collection = analysis.get("data_collection_results") or {}
+                conf_entry = data_collection.get("confirmation_number") or {}
+                confirmation_number = (
+                    conf_entry.get("value")
+                    or extract_confirmation_number_from_transcript(transcript)
+                )
                 db.add(ActionEvidence(
                     id=_new_id("evi_"),
                     action_id=action_id,

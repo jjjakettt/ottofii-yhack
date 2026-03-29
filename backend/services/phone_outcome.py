@@ -11,26 +11,20 @@ import re
 
 # Rep may say "confirmation number is X", "your reference is X", etc.
 _CONFIRMATION_NUMBER_PATTERNS: tuple[re.Pattern[str], ...] = (
-    # "confirmation number C2384" or "confirmation number is C2384"
+    # "confirmation number (is|for|of|…) XYZ" — absorbs prepositions before the ID
     re.compile(
-        r"\b(?:confirmation|reference)\s+number\s+(?:is\s+)?([A-Z0-9][A-Z0-9\-]{3,})\b",
+        r"\b(?:confirmation|reference|cancellation)\s+(?:number|code|id|#)\s+"
+        r"(?:(?:is|for|of|to|a|the|your|our)\s+)?(\S+)",
         re.IGNORECASE,
     ),
-    # "confirmation: C2384" or "confirmation C2384"
+    # "confirmation: XYZ" or "reference: XYZ"
     re.compile(
-        r"\bconfirmation\s*(?:code|#)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{3,})\b",
+        r"\b(?:confirmation|reference)\s*[:#]\s*(\S+)",
         re.IGNORECASE,
     ),
+    # "ticket/case number: XYZ"
     re.compile(
-        r"\breference\s*(?:#|code)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{3,})\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:ticket|case)\s*(?:#|number)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{3,})\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:order|cancellation)\s*(?:#|id|number)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{4,})\b",
+        r"\b(?:ticket|case)\s+(?:number|#|id)\s*[:#\s]\s*(\S+)",
         re.IGNORECASE,
     ),
 )
@@ -52,19 +46,18 @@ def extract_confirmation_number_from_transcript(transcript: list[dict]) -> str |
     junk = frozenset(
         {
             "number", "code", "here", "the", "your", "this", "that", "is", "are", "was",
+            "for", "of", "to", "a", "an", "our", "my", "their", "its", "and", "or",
             "process", "processed", "complete", "completed", "cancelled", "canceled",
-            "subscription", "account", "request", "cancellation", "done",
+            "subscription", "account", "request", "cancellation", "done", "call",
         }
     )
 
     for pat in _CONFIRMATION_NUMBER_PATTERNS:
         m = pat.search(text)
         if m:
-            raw = m.group(1).strip().rstrip(".,;:")
+            raw = m.group(1).strip().strip(".,;:()")
             low = raw.lower()
-            if len(raw) < 4 or low in junk:
-                continue
-            if any(c.isdigit() for c in raw):
+            if len(raw) >= 3 and low not in junk:
                 return raw
     return None
 
