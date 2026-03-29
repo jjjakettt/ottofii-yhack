@@ -32,12 +32,18 @@ async def agent_plan(req: PlanRequest, db: Session = Depends(get_db)):
     db.add(db_plan)
 
     for action in plan.actions:
-        # Upsert: if a pending recommendation already exists for this stream, update it in place
+        # Upsert: if a pending recommendation already exists for this stream,
+        # update it in place rather than inserting a new row. Rejected and
+        # completed recs are terminal — skip them to preserve user decisions
+        # and prevent duplicate rows.
         existing_rec = db.query(Recommendation).filter(
             Recommendation.org_id == ORG_ID,
             Recommendation.stream_id == action.stream_id,
-            Recommendation.status == "pending",
+            Recommendation.status.in_(["pending", "rejected", "completed"]),
         ).first()
+
+        if existing_rec and existing_rec.status in ("rejected", "completed"):
+            continue
 
         if existing_rec:
             existing_rec.action_type = action.action_type
