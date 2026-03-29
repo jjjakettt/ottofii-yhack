@@ -10,6 +10,7 @@ from google import genai as genai_client
 from config import OPENAI_API_KEY, GOOGLE_GEMINI_API_KEY
 from schemas import ActionItem, ActionPlan, Evidence, RecurringStream, SkippedStream, Strategy
 from agent.prompt import SYSTEM_PROMPT, build_user_prompt
+from agent.validators import pre_score, deduplicate_actions
 from stubs import STUB_STREAMS
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -175,9 +176,10 @@ async def build_plan(user_goal: str) -> ActionPlan:
 
         valid_actions.append(action)
 
-    actions = valid_actions
+    # Deduplicate: one action per stream_id, re-ranked by savings descending
+    actions = deduplicate_actions(valid_actions)
 
-    # Check 4: empty plan guard
+    # Empty plan guard
     if not actions:
         raise HTTPException(
             status_code=400,
@@ -198,6 +200,6 @@ async def build_plan(user_goal: str) -> ActionPlan:
         user_goal=user_goal,
         total_monthly_savings_usd=round(total_monthly, 2),
         total_annual_savings_usd=round(total_annual, 2),
-        actions=sorted(actions, key=lambda a: a.rank),
+        actions=actions,
         skipped=skipped,
     )
