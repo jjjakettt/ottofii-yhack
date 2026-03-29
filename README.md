@@ -6,6 +6,12 @@
 
 ---
 
+## Demo Video
+
+[![Watch the demo](https://img.youtube.com/vi/BPpuwG1usJs/maxresdefault.jpg)](https://youtu.be/BPpuwG1usJs)
+
+---
+
 ## Inspiration
 
 The average company spends **$49M–$55M annually on SaaS**, with large enterprises spending $123M–$375M+. Yet **30–50% of this spend is wasted** — unused licenses, duplicates, forgotten renewals — and 77–78% of companies report unexpected charges (Zylo, TechRadar).
