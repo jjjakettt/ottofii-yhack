@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config/api";
+import { DEMO_USER_ID } from "@/lib/demo-account";
 import type { ActionPlan, ConfirmResponse, RejectResponse, ExecuteResponse, RecommendationsResponse } from "@/types";
 
 // POST /agent/plan
@@ -15,7 +16,7 @@ export async function getActionPlan(userGoal = "Reduce my monthly spend"): Promi
 // POST /agent/confirm
 export async function confirmAction(
   recommendationId: string,
-  approvedBy = "user_demo"
+  approvedBy = DEMO_USER_ID
 ): Promise<ConfirmResponse> {
   const res = await fetch(`${API_BASE_URL}/agent/confirm`, {
     method: "POST",
@@ -39,7 +40,7 @@ export async function restoreRecommendation(recommendationId: string): Promise<v
 // POST /agent/reject
 export async function rejectAction(
   recommendationId: string,
-  rejectedBy = "user_demo"
+  rejectedBy = DEMO_USER_ID
 ): Promise<RejectResponse> {
   const res = await fetch(`${API_BASE_URL}/agent/reject`, {
     method: "POST",

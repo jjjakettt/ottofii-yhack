@@ -415,6 +415,14 @@ const RISK_DOT: Record<RegretRisk, string> = {
   high: "bg-destructive",
 };
 
+const SIM_STEPS = [
+  "Scanning recurring streams…",
+  "Analyzing spend patterns…",
+  "Identifying savings opportunities…",
+  "Calculating potential savings…",
+  "Generating recommendations…",
+];
+
 export default function RecommendationsPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("pending");
@@ -422,6 +430,7 @@ export default function RecommendationsPage() {
   const [actionTypeFilter, setActionTypeFilter] = useState<ActionType | "all">("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkMode, setBulkMode] = useState<"approve" | "reject" | null>(null);
+  const [simStep, setSimStep] = useState(0);
 
   const { recommendations, totalMonthlySavings, totalAnnualSavings, isLoading } =
     useRecommendations(tab === "pending" ? "pending" : "done");
@@ -455,6 +464,12 @@ export default function RecommendationsPage() {
   useEffect(() => {
     if (tab !== "pending") setSelectedIds([]);
   }, [tab]);
+
+  useEffect(() => {
+    if (!generatePlan.isPending) { setSimStep(0); return; }
+    const id = setInterval(() => setSimStep((s) => (s + 1) % SIM_STEPS.length), 1400);
+    return () => clearInterval(id);
+  }, [generatePlan.isPending]);
 
   const allPendingSelected =
     pendingSelectableIds.length > 0 && selectedPendingIds.length === pendingSelectableIds.length;
@@ -556,20 +571,22 @@ export default function RecommendationsPage() {
               </p>
             </div>
             <div className="flex flex-col items-stretch gap-2 sm:items-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                disabled={generatePlan.isPending || bulkBusy}
-                onClick={() => generatePlan.mutate(undefined)}
-              >
-                <RefreshCw
-                  className={cn("size-4", generatePlan.isPending && "animate-spin")}
-                  aria-hidden
-                />
-                Regenerate recommendations
-              </Button>
+              {recommendations.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={generatePlan.isPending || bulkBusy}
+                  onClick={() => generatePlan.mutate(undefined)}
+                >
+                  <RefreshCw
+                    className={cn("size-4", generatePlan.isPending && "animate-spin")}
+                    aria-hidden
+                  />
+                  Refresh
+                </Button>
+              )}
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">{tab === "pending" ? "Savings Potential" : "Savings Realized"}</div>
                 <div className="font-mono text-2xl font-semibold tabular-nums text-success">
@@ -783,6 +800,56 @@ export default function RecommendationsPage() {
             </div>
           )}
 
+          {/* Generate CTA / simulation — only on pending tab with no recommendations */}
+          {tab === "pending" && recommendations.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-6 rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center">
+              {generatePlan.isPending ? (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative flex size-12 items-center justify-center">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-20" />
+                    <Loader2 className="size-6 animate-spin text-primary" aria-hidden />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground transition-all duration-500">
+                      {SIM_STEPS[simStep]}
+                    </p>
+                    <p className="text-xs text-muted-foreground">This usually takes a few seconds</p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {SIM_STEPS.map((_, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          "size-1.5 rounded-full transition-all duration-300",
+                          i === simStep ? "bg-primary scale-125" : "bg-muted-foreground/30"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <p className="text-base font-medium text-foreground">No recommendations yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Let Otto analyze your subscriptions and find savings opportunities.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="default"
+                    className="gap-2"
+                    disabled={bulkBusy}
+                    onClick={() => generatePlan.mutate(undefined)}
+                  >
+                    <RefreshCw className="size-4" aria-hidden />
+                    Generate recommendations
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* List */}
           {filtered.length > 0 ? (
             <div className="space-y-3">
@@ -811,15 +878,17 @@ export default function RecommendationsPage() {
               ))}
             </div>
           ) : (
-            <div className="border border-border bg-card p-8 text-center">
-              <p className="text-muted-foreground">
-                {recommendations.length === 0
-                  ? tab === "pending"
-                    ? "No pending recommendations"
-                    : "Nothing completed yet"
-                  : "No recommendations match the selected filters"}
-              </p>
-            </div>
+            // Only show the fallback empty state when it's NOT the "no recs on pending" case
+            // (that case is handled by the generate CTA block above)
+            (recommendations.length > 0 || tab !== "pending") && (
+              <div className="border border-border bg-card p-8 text-center">
+                <p className="text-muted-foreground">
+                  {recommendations.length === 0
+                    ? "Nothing completed yet"
+                    : "No recommendations match the selected filters"}
+                </p>
+              </div>
+            )
           )}
         </div>
       </main>

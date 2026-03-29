@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Zap } from "lucide-react";
+import { DEMO_BUSINESS_NAME } from "@/lib/demo-account";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -58,7 +59,7 @@ export function AppHeader() {
       </div>
       <div className="ml-auto flex items-center gap-4">
         <ThemeToggle />
-        <span className="text-sm text-muted-foreground">user_demo</span>
+        <span className="text-sm text-muted-foreground">{DEMO_BUSINESS_NAME}</span>
       </div>
     </header>
   );
