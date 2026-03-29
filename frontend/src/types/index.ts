@@ -133,6 +133,8 @@ export interface RecommendationItem {
   evidence: Evidence;
   status: RecommendationStatus;
   created_at: string;
+  action_id?: string | null;
+  result_confirmation_id?: string | null;
 }
 
 export interface RecommendationsResponse {

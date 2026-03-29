@@ -35,10 +35,10 @@ export const usePlan = (userGoal?: string) => {
 export const useGeneratePlan = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (userGoal = "Reduce my monthly spend") => getActionPlan(userGoal),
+  return useMutation<ActionPlan, Error, string | undefined>({
+    mutationFn: (userGoal) => getActionPlan(userGoal ?? "Reduce my monthly spend"),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: recommendationsKey("pending") });
+      await queryClient.invalidateQueries({ queryKey: ["recommendations"] });
     },
   });
 };
@@ -51,7 +51,7 @@ export const useConfirmAction = () => {
       confirmAction(recommendationId, approvedBy),
     onSuccess: async ({ action_id }) => {
       await queryClient.invalidateQueries({ queryKey: actionKey(action_id) });
-      await queryClient.invalidateQueries({ queryKey: recommendationsKey("pending") });
+      await queryClient.invalidateQueries({ queryKey: ["recommendations"] });
     },
   });
 };
@@ -62,7 +62,7 @@ export const useRejectAction = () => {
   return useMutation<RejectResponse, Error, { recommendationId: string; rejectedBy?: string }>({
     mutationFn: ({ recommendationId, rejectedBy }) => rejectAction(recommendationId, rejectedBy),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: recommendationsKey("pending") });
+      await queryClient.invalidateQueries({ queryKey: ["recommendations"] });
     },
   });
 };

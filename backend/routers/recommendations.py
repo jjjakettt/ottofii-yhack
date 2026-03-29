@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from database import get_db
-from models import Recommendation, RecurringStream
+from models import Recommendation, RecurringStream, Action, ActionEvidence
 from schemas import (
     RecommendationItem, RecommendationsResponse, RecommendationStatus,
     Evidence, ActionType, RegretRisk
@@ -44,6 +44,26 @@ def get_recommendations(
             benchmark_price_per_seat=ev_data.get("benchmark_price_per_seat"),
             sources=ev_data.get("sources", []),
         )
+        action = (
+            db.query(Action)
+            .filter(Action.recommendation_id == rec.id)
+            .order_by(Action.created_at.desc())
+            .first()
+        )
+        action_id = str(action.id) if action else None
+        result_confirmation_id = None
+        if action:
+            conf_row = (
+                db.query(ActionEvidence)
+                .filter(
+                    ActionEvidence.action_id == action.id,
+                    ActionEvidence.type == "confirmation_id",
+                )
+                .first()
+            )
+            if conf_row and conf_row.payload:
+                result_confirmation_id = conf_row.payload.get("id")
+
         items.append(RecommendationItem(
             recommendation_id=str(rec.id),
             stream_id=str(rec.stream_id),
@@ -57,6 +77,8 @@ def get_recommendations(
             evidence=evidence,
             status=RecommendationStatus(str(rec.status)),
             created_at=rec.created_at.isoformat() if rec.created_at else "",
+            action_id=action_id,
+            result_confirmation_id=result_confirmation_id,
         ))
 
     total_monthly = sum(i.monthly_savings_usd for i in items)

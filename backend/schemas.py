@@ -231,6 +231,8 @@ class RecommendationItem(BaseModel):
     evidence: Evidence
     status: RecommendationStatus
     created_at: str
+    action_id: Optional[str] = None
+    result_confirmation_id: Optional[str] = None
 
 
 class RecommendationsResponse(BaseModel):
