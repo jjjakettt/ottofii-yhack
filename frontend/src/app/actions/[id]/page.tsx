@@ -428,28 +428,49 @@ export default function ActionStatusPage() {
               </div>
               <div className="divide-y divide-border">
                 {action.evidence.map((ev, index) => (
-                  <div key={index} className="flex items-center gap-4 p-4">
-                    <div className="flex h-10 w-10 items-center justify-center border border-border bg-background">
-                      {ev.type === "confirmation_id" ? (
-                        <FileCheck className="h-5 w-5 text-success" />
-                      ) : (
-                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium capitalize">
-                        {ev.type === "confirmation_id"
-                          ? "Confirmation ID"
-                          : ev.type === "email"
-                            ? "Email"
-                            : "Screenshot"}
+                  <div key={index} className="p-4">
+                    {ev.type === "screenshot" && ev.payload.base64 ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                            Screenshot
+                          </div>
+                          <a
+                            href={`data:${ev.payload.mime ?? "image/png"};base64,${ev.payload.base64}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            Open full size
+                          </a>
+                        </div>
+                        <div className="overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+                          <div className="max-h-[min(72vh,880px)] overflow-auto">
+                            <img
+                              src={`data:${ev.payload.mime ?? "image/png"};base64,${ev.payload.base64}`}
+                              alt="Execution screenshot"
+                              className="block h-auto w-full max-w-full min-w-0"
+                              decoding="async"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="font-mono text-sm text-muted-foreground">
-                        {ev.payload.id ??
-                          ev.payload.path ??
-                          JSON.stringify(ev.payload)}
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-10 w-10 items-center justify-center border border-border bg-background">
+                          <FileCheck className="h-5 w-5 text-success" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium capitalize">
+                            {ev.type === "confirmation_id" ? "Confirmation ID" : ev.type}
+                          </div>
+                          <div className="font-mono text-sm text-muted-foreground">
+                            {ev.payload.id ?? ev.payload.path ?? ev.payload.value ?? JSON.stringify(ev.payload)}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
