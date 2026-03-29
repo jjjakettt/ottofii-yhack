@@ -125,7 +125,6 @@ const statusBadgeConfig: Partial<
 
 function ActionTypeBadge({ type }: { type: ActionType }) {
   const cfg = actionTypeConfig[type];
-  const Icon = cfg.icon;
   return (
     <span
       className={cn(
@@ -134,7 +133,7 @@ function ActionTypeBadge({ type }: { type: ActionType }) {
         cfg.textClassName
       )}
     >
-      <Icon className="h-3 w-3" />
+      <span className="text-muted-foreground font-normal">Action:</span>
       {cfg.label}
     </span>
   );
@@ -142,7 +141,6 @@ function ActionTypeBadge({ type }: { type: ActionType }) {
 
 function RiskBadge({ risk }: { risk: RegretRisk }) {
   const cfg = regretRiskConfig[risk];
-  const Icon = cfg.icon;
   return (
     <span
       className={cn(
@@ -151,7 +149,7 @@ function RiskBadge({ risk }: { risk: RegretRisk }) {
         cfg.textClassName
       )}
     >
-      <Icon className="h-3 w-3" />
+      <span className="text-muted-foreground font-normal">Regret risk:</span>
       {cfg.label}
     </span>
   );
@@ -404,7 +402,7 @@ export default function RecommendationsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkMode, setBulkMode] = useState<"approve" | "reject" | null>(null);
 
-  const { recommendations, totalMonthlySavings, totalAnnualSavings, isLoading, isFetching } =
+  const { recommendations, totalMonthlySavings, totalAnnualSavings, isLoading } =
     useRecommendations(tab === "pending" ? "pending" : "done");
 
   const confirm = useConfirmAction();
@@ -434,10 +432,6 @@ export default function RecommendationsPage() {
   useEffect(() => {
     if (tab !== "pending") setSelectedIds([]);
   }, [tab]);
-
-  useEffect(() => {
-    setSelectedIds((prev) => prev.filter((id) => pendingSelectableIds.includes(id)));
-  }, [pendingSelectableIds]);
 
   const allPendingSelected =
     pendingSelectableIds.length > 0 && selectedPendingIds.length === pendingSelectableIds.length;
@@ -519,13 +513,6 @@ export default function RecommendationsPage() {
     <div className="flex min-h-screen flex-col">
       <AppHeader />
 
-      {isFetching && recommendations.length > 0 && (
-        <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-6 py-2 text-sm text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Refreshing…
-        </div>
-      )}
-
       <main className="flex-1 px-6 py-6">
         <div className="mx-auto max-w-4xl space-y-6">
           {/* Header */}
@@ -551,18 +538,16 @@ export default function RecommendationsPage() {
                 />
                 Regenerate recommendations
               </Button>
-              {tab === "pending" && totalMonthlySavings > 0 && (
-                <div className="text-right">
-                  <div className="text-sm text-muted-foreground">Savings Potential</div>
-                  <div className="font-mono text-2xl font-semibold tabular-nums text-success">
-                    {formatCurrency(totalMonthlySavings)}
-                    <span className="text-sm font-normal text-muted-foreground">/mo</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {formatCurrency(totalAnnualSavings)} annually
-                  </div>
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground">{tab === "pending" ? "Savings Potential" : "Savings Realized"}</div>
+                <div className="font-mono text-2xl font-semibold tabular-nums text-success">
+                  {formatCurrency(totalMonthlySavings)}
+                  <span className="text-sm font-normal text-muted-foreground">/mo</span>
                 </div>
-              )}
+                <div className="text-sm text-muted-foreground">
+                  {formatCurrency(totalAnnualSavings)} annually
+                </div>
+              </div>
             </div>
           </div>
 
@@ -575,10 +560,10 @@ export default function RecommendationsPage() {
                   type="button"
                   onClick={() => setTab(t)}
                   className={cn(
-                    "px-4 py-2 text-sm font-medium capitalize transition-colors",
+                    "cursor-pointer px-4 py-2 text-sm font-medium capitalize transition-colors",
                     tab === t
                       ? "border-b-2 border-foreground text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-t-sm"
                   )}
                 >
                   {t === "pending" ? "Pending" : "Completed"}
@@ -700,7 +685,7 @@ export default function RecommendationsPage() {
             </div>
           </div>
 
-          {tab === "pending" && pendingSelectableIds.length > 0 && (
+{tab === "pending" && pendingSelectableIds.length > 0 && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <Checkbox
