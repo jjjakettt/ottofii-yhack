@@ -430,16 +430,31 @@ export default function ActionStatusPage() {
                 {action.evidence.map((ev, index) => (
                   <div key={index} className="p-4">
                     {ev.type === "screenshot" && ev.payload.base64 ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                          Screenshot
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                            Screenshot
+                          </div>
+                          <a
+                            href={`data:${ev.payload.mime ?? "image/png"};base64,${ev.payload.base64}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            Open full size
+                          </a>
                         </div>
-                        <img
-                          src={`data:${ev.payload.mime ?? "image/png"};base64,${ev.payload.base64}`}
-                          alt="Execution screenshot"
-                          className="w-full rounded border border-border"
-                        />
+                        <div className="overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+                          <div className="max-h-[min(72vh,880px)] overflow-auto">
+                            <img
+                              src={`data:${ev.payload.mime ?? "image/png"};base64,${ev.payload.base64}`}
+                              alt="Execution screenshot"
+                              className="block h-auto w-full max-w-full min-w-0"
+                              decoding="async"
+                            />
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-4">
