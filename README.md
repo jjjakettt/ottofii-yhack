@@ -1,6 +1,16 @@
 # Ottofii — AI Cost Optimization Agent
 
-> Autonomous agent platform that detects recurring SaaS spend, identifies savings opportunities, and executes cancellation/downgrade/renegotiation actions — with human-in-the-loop controls.
+> **Autonomous agent platform for enterprises that detects recurring spend, identifies savings opportunities, and executes cancellation/downgrade/renegotiation actions with human-in-the-loop controls.**
+
+**Try it:** https://github.com/jjjakettt/ottofii-yhack
+
+---
+
+## Inspiration
+
+The average company spends **$49M–$55M annually on SaaS**, with large enterprises spending $123M–$375M+. Yet **30–50% of this spend is wasted** — unused licenses, duplicates, forgotten renewals — and 77–78% of companies report unexpected charges (Zylo, TechRadar).
+
+The problem isn't awareness. It's execution. Canceling subscriptions requires logging into portals, calling support lines, navigating retention offers, and collecting confirmation numbers. Nobody does it. We built a system that does.
 
 ---
 
@@ -8,14 +18,13 @@
 
 **Detect → Decide → Act → Verify**
 
-Ottofii is an AI agent that:
+**Detect:** Ottofii analyzes your financial signals — bank transactions, email receipts, SaaS usage — and identifies recurring charges using deterministic cadence detection and merchant normalization.
 
-1. **Detects** recurring and wasteful SaaS spend across your organization
-2. **Analyzes** usage patterns and generates a ranked action plan
-3. **Executes** cancellations, downgrades, and renegotiations — via browser automation or phone calls
-4. **Verifies** outcomes with proof of completion (confirmation IDs, screenshots, call transcripts)
+**Decide:** Ottofii analyzes every detected stream against your usage patterns and generates a ranked action plan with plain-English reasoning: *"You haven't used Notion in 32 days. Canceling saves you $155/year."*
 
-> LLMs are a commodity. Execution + data is the moat. This is not a dashboard — it is a system that *acts*.
+**Act:** With one click to approve, Ottofii executes automatically via multi-channel automation: browser, email, or an AI-powered phone agent (ElevenLabs + Twilio) that handles retention offers and verification on your behalf.
+
+**Verify:** Every completed action produces proof — a confirmation ID, screenshot, and call transcript — stored in a full audit trail.
 
 ---
 
@@ -44,7 +53,7 @@ Before Otto runs its analysis, the Recommendations page prompts you to kick off 
 Otto analyzes every subscription against usage, seat count, and contract data in real time.
 
 ![Generating recommendations](frontend/screenshots/recs_generation.png)
-*Claude calculates potential savings across all detected subscriptions — typically completes in a few seconds.*
+*Otto calculates potential savings across all detected subscriptions — typically completes in a few seconds.*
 
 ---
 
@@ -80,7 +89,7 @@ For vendors with supported portals, Otto uses browser automation to execute canc
 
 ### 7. Execution — Phone Call Fallback (Notion)
 
-When browser automation isn't available for a vendor, Otto falls back to making a real phone call. Otto acts as a voice agent, navigates the support line, and extracts the confirmation number from the conversation.
+When browser automation isn't available for a vendor, Otto falls back to making a real phone call. Otto acts as a voice agent, navigates the support line, handles retention offers, and extracts the confirmation number from the conversation.
 
 ![Phone cancellation — success](frontend/screenshots/phone_success.png)
 *Notion cancelled via phone call — $320/mo saved. Browser automation failed and Otto automatically fell back to a live phone cancellation.*
@@ -95,10 +104,60 @@ When browser automation isn't available for a vendor, Otto falls back to making 
 
 ### 8. Completed Actions — Rejected
 
-Any recommendations you reject are tracked in the Completed tab with their status, so you have a full audit trail of every decision made.
+Any recommendations you reject are tracked in the Completed tab, so you have a full audit trail of every decision made.
 
 ![Rejected recommendations](frontend/screenshots/recs_rejected.png)
 *Completed tab showing rejected actions (AWS downgrade and Loom cancellation) alongside $1,010/mo in realized savings from approved actions.*
+
+---
+
+## How We Built It
+
+We split the system into four ownership layers with strict API contracts defined upfront in a shared `TEAM.md`. This let everyone build in parallel without blocking each other.
+
+**Frontend:** Next.js 14 (App Router + TypeScript), React 19, TanStack Query, shadcn/ui.
+
+**Detection Layer:** Python + FastAPI — deterministic rules for merchant normalization, cadence detection (monthly/annual/quarterly), confidence scoring, and blocklisting of payroll, rent, and other protected categories.
+
+**Intelligence Layer:** Before calling any LLM, we pre-score each subscription deterministically based on monthly equivalent spend, savings rank, and regret risk — so the model only handles explanation and prioritization. We use OpenAI `gpt-4o-mini` with JSON mode for structured output, with automatic fallback to Google Gemini 2.0 Flash if OpenAI fails. The response is validated on our end: hallucinated stream IDs are stripped, savings are capped at actual spend, and duplicates are removed before the plan is returned.
+
+**Execution Layer:** Two channels. Playwright automates our demo cancellation portal for browser-based flows, capturing a confirmation ID and screenshot as proof. For merchants requiring a phone call, we integrated ElevenLabs Conversational AI with Twilio to make real outbound calls. The voice agent handles the full conversation including retention offers, and we parse the transcript to extract the confirmation number. Users can abort a live call from the UI at any point.
+
+**Database:** SQLAlchemy ORM backed by Supabase (PostgreSQL). Seven tables covering the full lifecycle — detected subscriptions, LLM-generated plans, recommendations, an action state machine (`proposed → approved → executing → succeeded/failed`), proof artifacts, and a full audit log. Every action carries an idempotency key to prevent double-cancellations on retries.
+
+---
+
+## Challenges
+
+**ElevenLabs conversation polling:** Detecting when a voice call completed and extracting the confirmation number from the transcript required normalizing spoken numbers ("three four seven" → `347`), handling variable transcript formats, and building a polling mechanism that didn't time out prematurely.
+
+**Demo portal automation:** Rather than fighting real vendor CAPTCHAs and 2FA, we built a realistic fake cancellation portal with the same UX shape and `data-attributes` for Playwright to target.
+
+**Parallel development under time pressure:** Four people building four layers simultaneously meant any interface mismatch would cascade. Writing shared Pydantic schemas and a strict API contract doc before touching implementation code saved us from integration chaos at the end.
+
+---
+
+## Accomplishments
+
+**An end-to-end loop that actually works:** The full flow — connect → detect → plan → approve → execute → confirmation number + screenshot — runs without manual intervention. Watching Otto call a phone number, navigate a retention offer, and return a confirmation ID was the moment the project became real.
+
+**AI that calls people:** Most hackathon projects demo a chat interface. Ours makes outbound phone calls. The ElevenLabs + Twilio integration handles live conversations, adapts to whatever the support rep says, and parses the result.
+
+---
+
+## What We Learned
+
+**Separate deterministic logic from LLM logic.** When the model was responsible for calculations or pattern detection, results were inconsistent. Pre-scoring the data before sending it to the model — and validating output afterward — made the system far more reliable.
+
+**Team contracts matter as much as code.** Writing down shared types and API shapes before anyone wrote implementation code meant four people could build in parallel and integrate cleanly at the end. At a hackathon, that's the difference between a working demo and a merge conflict disaster.
+
+---
+
+## What's Next
+
+- **Real data connectors:** OAuth integrations with Gmail and Plaid to replace mock data with live transactions and email receipts.
+- **Free trial watcher:** Detect trial start dates and auto-cancel before the first charge hits.
+- **Individual tier:** The same engine applied to personal subscriptions.
 
 ---
 
@@ -106,33 +165,15 @@ Any recommendations you reject are tracked in the Completed tab with their statu
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js (App Router) + Tailwind CSS |
+| Frontend | Next.js 14 (App Router) + TypeScript + Tailwind CSS |
+| UI Components | React 19 + TanStack Query + shadcn/ui |
 | Backend | FastAPI (Python) |
-| Database | SQLite → Postgres (migration-ready) |
-| LLM | Openai API & Google Gemini API — structured outputs + tool calling |
-| Browser Automation | Playwright (against vendor demo portals) |
-| Voice Agent | ElevenLabs conversational AI — phone call execution + confirmation extraction |
-| Data | Seeded mock transactions + sandbox mode |
+| Database | SQLAlchemy + Supabase (PostgreSQL) |
+| LLM | OpenAI gpt-4o-mini + Google Gemini 2.0 Flash (fallback) |
+| Browser Automation | Playwright |
+| Voice Agent | ElevenLabs Conversational AI + Twilio |
 
----
-
-## Architecture
-
-```
-Transactions / Invoices
-        ↓
-  Subscription Detection (Openai / Gemini)
-        ↓
-  Action Plan Generation (Openai / Gemini)
-        ↓
-  Human Approval (UI)
-        ↓
-  Execution Engine
-    ├── Browser Automation (Playwright)
-    └── Phone Call Agent (ElevenLabs)
-        ↓
-  Proof of Completion + Savings Tracking
-```
+**Built with:** `python` `next.js` `supabase` `sqlalchemy` `typescript` `react` `fastapi` `postgresql` `openai` `gemini` `elevenlabs` `twilio` `playwright`
 
 ---
 
