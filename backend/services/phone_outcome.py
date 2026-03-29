@@ -9,6 +9,29 @@ from __future__ import annotations
 
 import re
 
+_WORD_TO_DIGIT = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+}
+
+
+def normalize_confirmation_number(raw: str) -> str:
+    """
+    Convert a spoken confirmation number to its compact alphanumeric form.
+    e.g. "six B X Y two Z" → "6BXY2Z"
+    """
+    tokens = raw.strip().split()
+    result = []
+    for token in tokens:
+        clean = token.strip(".,;:()")
+        lower = clean.lower()
+        if lower in _WORD_TO_DIGIT:
+            result.append(_WORD_TO_DIGIT[lower])
+        elif re.fullmatch(r"[A-Za-z0-9\-]+", clean):
+            result.append(clean.upper())
+        # skip anything else (articles, punctuation fragments)
+    return "".join(result)
+
 # Rep may say "confirmation number is X", "your reference is X", etc.
 _CONFIRMATION_NUMBER_PATTERNS: tuple[re.Pattern[str], ...] = (
     # "confirmation number (is|for|of|…) XYZ" — absorbs prepositions before the ID
