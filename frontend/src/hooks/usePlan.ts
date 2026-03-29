@@ -1,14 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getActionPlan, confirmAction, executeAction, getRecommendations } from "@/apis/agent";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getActionPlan, confirmAction, rejectAction, executeAction, getRecommendations } from "@/apis/agent";
 import { planKey, actionKey, savingsSummaryKey, recommendationsKey } from "./keys";
-import type { ActionPlan, RecommendationsResponse } from "@/types";
+import type { ActionPlan, RecommendationsResponse, RejectResponse } from "@/types";
 
 export const useRecommendations = (status = "pending") => {
   const query = useQuery<RecommendationsResponse>({
     queryKey: recommendationsKey(status),
     queryFn: () => getRecommendations(status),
+    placeholderData: keepPreviousData,
   });
 
   return {
@@ -50,6 +51,18 @@ export const useConfirmAction = () => {
       confirmAction(recommendationId, approvedBy),
     onSuccess: async ({ action_id }) => {
       await queryClient.invalidateQueries({ queryKey: actionKey(action_id) });
+      await queryClient.invalidateQueries({ queryKey: recommendationsKey("pending") });
+    },
+  });
+};
+
+export const useRejectAction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<RejectResponse, Error, { recommendationId: string; rejectedBy?: string }>({
+    mutationFn: ({ recommendationId, rejectedBy }) => rejectAction(recommendationId, rejectedBy),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: recommendationsKey("pending") });
     },
   });
 };

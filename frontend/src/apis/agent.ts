@@ -1,10 +1,9 @@
-import type { ActionPlan, ConfirmResponse, ExecuteResponse, RecommendationsResponse } from "@/types";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { API_BASE_URL } from "@/config/api";
+import type { ActionPlan, ConfirmResponse, RejectResponse, ExecuteResponse, RecommendationsResponse } from "@/types";
 
 // POST /agent/plan
 export async function getActionPlan(userGoal = "Reduce my monthly spend"): Promise<ActionPlan> {
-  const res = await fetch(`${API}/agent/plan`, {
+  const res = await fetch(`${API_BASE_URL}/agent/plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_goal: userGoal }),
@@ -18,7 +17,7 @@ export async function confirmAction(
   recommendationId: string,
   approvedBy = "user_demo"
 ): Promise<ConfirmResponse> {
-  const res = await fetch(`${API}/agent/confirm`, {
+  const res = await fetch(`${API_BASE_URL}/agent/confirm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ recommendation_id: recommendationId, approved_by: approvedBy }),
@@ -27,16 +26,30 @@ export async function confirmAction(
   return res.json();
 }
 
+// POST /agent/reject
+export async function rejectAction(
+  recommendationId: string,
+  rejectedBy = "user_demo"
+): Promise<RejectResponse> {
+  const res = await fetch(`${API_BASE_URL}/agent/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recommendation_id: recommendationId, rejected_by: rejectedBy }),
+  });
+  if (!res.ok) throw new Error(`POST /agent/reject failed: ${res.status}`);
+  return res.json();
+}
+
 // GET /recommendations?status=pending|completed|all
 export async function getRecommendations(status = "pending"): Promise<RecommendationsResponse> {
-  const res = await fetch(`${API}/recommendations?status=${status}`);
+  const res = await fetch(`${API_BASE_URL}/recommendations?status=${status}`);
   if (!res.ok) throw new Error(`GET /recommendations failed: ${res.status}`);
   return res.json();
 }
 
 // POST /agent/execute
 export async function executeAction(actionId: string): Promise<ExecuteResponse> {
-  const res = await fetch(`${API}/agent/execute`, {
+  const res = await fetch(`${API_BASE_URL}/agent/execute`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action_id: actionId }),

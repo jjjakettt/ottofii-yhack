@@ -27,6 +27,8 @@ def get_recommendations(
         query = query.filter(Recommendation.status == "pending")
     elif status == "completed":
         query = query.filter(Recommendation.status == "completed")
+    elif status == "done":
+        query = query.filter(Recommendation.status.in_(["approved", "completed", "rejected"]))
     # "all" — no additional filter
 
     rows = query.order_by(Recommendation.created_at.desc()).all()
