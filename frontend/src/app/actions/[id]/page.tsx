@@ -15,6 +15,8 @@ import {
   MinusCircle,
   MessageSquare,
   ArrowRightLeft,
+  Phone,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
@@ -26,9 +28,21 @@ import type { ActionEvidence, ActionStatus as ActionStatusType, ActionType } fro
 
 function agentStepMessages(
   actionType: ActionType,
-  merchant: string
+  merchant: string,
+  channel?: string,
 ): string[] {
   const m = merchant;
+
+  if (channel === "phone") {
+    return [
+      `Browser automation unavailable for ${m}…`,
+      "Initiating phone call via Jamie…",
+      "Jamie connected — requesting cancellation…",
+      "Declining retention offers…",
+      "Awaiting confirmation number…",
+    ];
+  }
+
   switch (actionType) {
     case "cancel":
       return [
@@ -73,14 +87,16 @@ function AgentExecutionSteps({
   active,
   actionType,
   merchant,
+  channel,
 }: {
   active: boolean;
   actionType: ActionType;
   merchant: string;
+  channel?: string;
 }) {
   const steps = useMemo(
-    () => agentStepMessages(actionType, merchant),
-    [actionType, merchant]
+    () => agentStepMessages(actionType, merchant, channel),
+    [actionType, merchant, channel]
   );
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -161,12 +177,84 @@ function formatDateTime(iso: string | null): string {
 function EvidenceBlock({ ev }: { ev: ActionEvidence }) {
   const screenshotSrc =
     ev.type === "screenshot" ? getScreenshotDataUrl(ev.payload) : null;
-  const title =
-    ev.type === "confirmation_id"
-      ? "Confirmation ID"
-      : ev.type === "email"
-        ? "Email"
-        : "Screenshot";
+
+  const titleMap: Record<string, string> = {
+    confirmation_id: "Confirmation ID",
+    email: "Email",
+    screenshot: "Screenshot",
+    call_transcript: "Call Transcript",
+    browser_failure: "Browser Automation Failed",
+  };
+  const title = titleMap[ev.type] ?? ev.type;
+
+  if (ev.type === "browser_failure") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-warning/30 bg-warning/10">
+            <AlertTriangle className="h-5 w-5 text-warning" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="text-sm font-medium">{title}</div>
+            <p className="text-sm text-muted-foreground">{ev.payload.error}</p>
+            {ev.payload.fallback && (
+              <p className="text-xs text-muted-foreground">
+                Fallback: <span className="font-medium text-foreground capitalize">{ev.payload.fallback} call</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === "call_transcript") {
+    const transcript: Array<{ role: string; message: string }> =
+      ev.payload.transcript ?? [];
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-primary/30 bg-primary/10">
+            <Phone className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="text-sm font-medium">{title}</div>
+            <div className="text-xs text-muted-foreground">
+              Called{" "}
+              <span className="font-medium text-foreground">{ev.payload.contact_name}</span>
+              {" · "}
+              <span className="font-mono">{ev.payload.contact_phone}</span>
+            </div>
+            {transcript.length > 0 ? (
+              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+                {transcript.map((turn, i) => (
+                  <div key={i} className={cn("flex gap-2 text-sm", turn.role === "agent" ? "justify-start" : "justify-end")}>
+                    <div
+                      className={cn(
+                        "max-w-[80%] rounded-lg px-3 py-2",
+                        turn.role === "agent"
+                          ? "bg-primary/10 text-foreground"
+                          : "bg-muted text-foreground"
+                      )}
+                    >
+                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {turn.role === "agent" ? "Jamie" : "Support Rep"}
+                      </span>
+                      {turn.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : ev.payload.transcript_text ? (
+              <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-3 font-sans text-sm text-foreground">
+                {ev.payload.transcript_text}
+              </pre>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4">
@@ -428,6 +516,7 @@ export default function ActionStatusPage() {
               active={action.status === "executing"}
               actionType={action.action_type}
               merchant={action.merchant}
+              channel={action.channel}
             />
 
 
@@ -456,7 +545,7 @@ export default function ActionStatusPage() {
             </div>
           </div>
 
-          {action.status === "succeeded" && action.evidence.length > 0 && (
+          {(action.status === "succeeded" || action.status === "failed") && action.evidence.length > 0 && (
             <div className="border border-border bg-card">
               <div className="border-b border-border px-6 py-4">
                 <h2 className="font-medium">Proof of Completion</h2>

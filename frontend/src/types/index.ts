@@ -85,11 +85,28 @@ export interface ActionPlan {
   skipped: SkippedStream[];
 }
 
-// Action Evidence
-export interface ActionEvidence {
-  type: "screenshot" | "confirmation_id" | "email";
-  payload: Record<string, string>;
-}
+// Action Evidence (discriminated by `type` — backend may add new kinds over time)
+export type ActionEvidence =
+  | {
+      type: "screenshot" | "confirmation_id" | "email";
+      payload: Record<string, string>;
+    }
+  | {
+      type: "browser_failure";
+      payload: {
+        error?: string;
+        fallback?: string;
+      };
+    }
+  | {
+      type: "call_transcript";
+      payload: {
+        transcript?: Array<{ role: string; message: string }>;
+        transcript_text?: string;
+        contact_name?: string;
+        contact_phone?: string;
+      };
+    };
 
 // Action Detail
 export interface ActionDetail {

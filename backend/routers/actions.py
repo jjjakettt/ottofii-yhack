@@ -16,6 +16,8 @@ from models import Action, ActionEvidence, AuditEvent, Recommendation, Recurring
 from schemas import ActionDetail, ActionEvidenceSchema, ExecuteRequest, ExecuteResponse, SavingsSummary
 from policy import check_policy
 from executors.browser_cancel import browser_cancel
+from services.contacts import get_contacts, PHONE_FALLBACK_MERCHANTS, DEMO_ACCOUNT
+from services.elevenlabs import initiate_call, poll_call_until_done, format_transcript
 
 router = APIRouter()
 
@@ -48,6 +50,9 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
     """
     Runs in the background after POST /agent/execute returns.
     Updates action status and stores evidence in DB.
+
+    For merchants in PHONE_FALLBACK_MERCHANTS, browser automation is
+    intentionally skipped and the ElevenLabs phone agent is used instead.
     """
     from database import SessionLocal
     db = SessionLocal()
@@ -57,36 +62,122 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
         if not action:
             return
 
-        # ── Execute via Playwright ─────────────────────────────────────────
+        # ── Execute via Playwright (unless merchant forces phone fallback) ─────
+        browser_error: str | None = None
+
+        if merchant.lower() in PHONE_FALLBACK_MERCHANTS:
+            browser_error = (
+                f"Browser automation unavailable for '{merchant}': "
+                "vendor portal returned an unexpected response. "
+                "Falling back to phone cancellation."
+            )
+        else:
+            try:
+                result = await browser_cancel(
+                    subscription_id=subscription_id,
+                    merchant=merchant,
+                )
+
+                db.add(ActionEvidence(
+                    id=_new_id("evi_"),
+                    action_id=action_id,
+                    type="confirmation_id",
+                    payload={"id": result["confirmation_id"]},
+                ))
+                db.add(ActionEvidence(
+                    id=_new_id("evi_"),
+                    action_id=action_id,
+                    type="screenshot",
+                    payload={
+                        "base64": result["screenshot_base64"],
+                        "mime": result["mime"],
+                    },
+                ))
+
+                action.status = "succeeded"
+                action.executed_at = _now()
+
+                rec = db.query(Recommendation).filter(
+                    Recommendation.id == action.recommendation_id
+                ).first()
+                if rec:
+                    rec.status = "completed"
+
+                _write_audit(db, "action.succeeded", "action", action_id, {
+                    "merchant": merchant,
+                    "confirmation_id": result["confirmation_id"],
+                })
+                db.commit()
+                return
+
+            except RuntimeError as e:
+                browser_error = str(e)
+
+        # ── Phone fallback via ElevenLabs ─────────────────────────────────────
+        contacts = get_contacts(merchant)
+        if not contacts:
+            # No phone contacts configured — mark as failed
+            action.status = "failed"
+            action.executed_at = _now()
+            _write_audit(db, "action.failed", "action", action_id, {
+                "merchant": merchant,
+                "error": browser_error,
+            })
+            db.commit()
+            return
+
+        contact = contacts[0]
+
+        # Record the browser failure so the UI can show what happened
+        db.add(ActionEvidence(
+            id=_new_id("evi_"),
+            action_id=action_id,
+            type="browser_failure",
+            payload={
+                "error": browser_error,
+                "fallback": "phone",
+            },
+        ))
+
+        # Switch channel to phone
+        action.channel = "phone"
+        db.commit()
+
+        _write_audit(db, "action.phone_fallback", "action", action_id, {
+            "merchant": merchant,
+            "contact_name": contact["name"],
+            "contact_phone": contact["phone"],
+            "browser_error": browser_error,
+        })
+        db.commit()
+
         try:
-            result = await browser_cancel(
-                subscription_id=subscription_id,
-                merchant=merchant,
+            conversation_id = await initiate_call(
+                to_number=contact["phone"],
+                full_name=DEMO_ACCOUNT["full_name"],
+                account_phone=DEMO_ACCOUNT["phone"],
+                subscription_name=merchant,
             )
 
-            # Store confirmation ID evidence
-            db.add(ActionEvidence(
-                id=_new_id("evi_"),
-                action_id=action_id,
-                type="confirmation_id",
-                payload={"id": result["confirmation_id"]},
-            ))
+            conv_data = await poll_call_until_done(conversation_id)
 
-            # Store screenshot evidence (base64 in DB — no file storage needed)
+            transcript_text = format_transcript(conv_data.get("transcript", []))
             db.add(ActionEvidence(
                 id=_new_id("evi_"),
                 action_id=action_id,
-                type="screenshot",
+                type="call_transcript",
                 payload={
-                    "base64": result["screenshot_base64"],
-                    "mime": result["mime"],
+                    "conversation_id": conversation_id,
+                    "contact_name": contact["name"],
+                    "contact_phone": contact["phone"],
+                    "transcript": conv_data.get("transcript", []),
+                    "transcript_text": transcript_text,
                 },
             ))
 
             action.status = "succeeded"
             action.executed_at = _now()
 
-            # Mark the recommendation as completed so frontend filters it out
             rec = db.query(Recommendation).filter(
                 Recommendation.id == action.recommendation_id
             ).first()
@@ -95,16 +186,18 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
 
             _write_audit(db, "action.succeeded", "action", action_id, {
                 "merchant": merchant,
-                "confirmation_id": result["confirmation_id"],
+                "channel": "phone",
+                "conversation_id": conversation_id,
+                "contact_name": contact["name"],
             })
 
-        except RuntimeError as e:
+        except RuntimeError as call_error:
             action.status = "failed"
             action.executed_at = _now()
-
             _write_audit(db, "action.failed", "action", action_id, {
                 "merchant": merchant,
-                "error": str(e),
+                "channel": "phone",
+                "error": str(call_error),
             })
 
         db.commit()
