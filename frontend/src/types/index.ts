@@ -105,6 +105,31 @@ export type ActionEvidence =
         transcript_text?: string;
         contact_name?: string;
         contact_phone?: string;
+        confirmation_number?: string | null;
+      };
+    }
+  | {
+      type: "execution_cancelled";
+      payload: { reason?: string };
+    }
+  | {
+      type: "phone_attempt";
+      payload: {
+        contact_name?: string;
+        contact_phone?: string;
+        conversation_id?: string;
+        conversation_status?: string;
+        error?: string;
+      };
+    }
+  | {
+      type: "phone_retry_scheduled";
+      payload: {
+        message?: string;
+        retry_after_seconds?: number;
+        retry_window_minutes?: string;
+        next_contact_name?: string;
+        next_contact_phone?: string;
       };
     };
 

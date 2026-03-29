@@ -76,3 +76,12 @@ export async function retryAction(actionId: string): Promise<ExecuteResponse> {
   if (!res.ok) throw new Error(`POST /actions/${actionId}/retry failed: ${res.status}`);
   return res.json();
 }
+
+// POST /actions/{action_id}/cancel
+export async function cancelAction(actionId: string): Promise<ExecuteResponse> {
+  const res = await fetch(`${API_BASE_URL}/actions/${actionId}/cancel`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`POST /actions/${actionId}/cancel failed: ${res.status}`);
+  return res.json();
+}

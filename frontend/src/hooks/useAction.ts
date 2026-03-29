@@ -5,13 +5,21 @@ import { getAction, getSavingsSummary } from "@/apis/actions";
 import { actionKey, savingsSummaryKey } from "./keys";
 import type { ActionDetail, SavingsSummary } from "@/types";
 
+function hasPhoneRetryScheduled(evidence: ActionDetail["evidence"] | undefined): boolean {
+  return evidence?.some((e) => e.type === "phone_retry_scheduled") ?? false;
+}
+
 export const useAction = (actionId: string) => {
   const query = useQuery<ActionDetail>({
     queryKey: actionKey(actionId),
     queryFn: () => getAction(actionId),
-    // Poll while mock agent is “executing” so status flips without a full page wait.
-    refetchInterval: (query) =>
-      query.state.data?.status === "executing" ? 400 : false,
+    // Poll while executing; also while failed-but-waiting for a scheduled next call.
+    refetchInterval: (query) => {
+      const d = query.state.data;
+      if (d?.status === "executing") return 400;
+      if (d?.status === "failed" && hasPhoneRetryScheduled(d.evidence)) return 5000;
+      return false;
+    },
     enabled: !!actionId,
   });
 

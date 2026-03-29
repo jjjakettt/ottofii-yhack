@@ -24,7 +24,7 @@ import { AppHeader } from "@/components/app-header";
 import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
 import { useQueryClient } from "@tanstack/react-query";
-import { retryAction } from "@/apis/agent";
+import { cancelAction, retryAction } from "@/apis/agent";
 import { formatEvidencePrimaryLine, getScreenshotDataUrl } from "@/lib/evidence-display";
 import { cn } from "@/lib/utils";
 import type { ActionEvidence, ActionStatus as ActionStatusType, ActionType } from "@/types";
@@ -187,8 +187,91 @@ function EvidenceBlock({ ev }: { ev: ActionEvidence }) {
     screenshot: "Screenshot",
     call_transcript: "Call Transcript",
     browser_failure: "Browser Automation Failed",
+    execution_cancelled: "Execution Stopped",
+    phone_attempt: "Phone Attempt",
+    phone_retry_scheduled: "Next call scheduled",
   };
   const title = titleMap[ev.type] ?? ev.type;
+
+  if (ev.type === "execution_cancelled") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-muted/50">
+            <CancelIcon className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="text-sm font-medium">{title}</div>
+            <p className="text-sm text-muted-foreground">
+              You stopped this run. You can retry when you are ready.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === "phone_retry_scheduled") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-primary/30 bg-primary/10">
+            <Phone className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="text-sm font-medium">{title}</div>
+            {ev.payload.message != null && (
+              <p className="text-sm text-muted-foreground">{String(ev.payload.message)}</p>
+            )}
+            <p className="text-sm text-foreground">
+              Another attempt will run automatically in about{" "}
+              <span className="font-medium">{ev.payload.retry_window_minutes ?? "1–2"} minutes</span>
+              {ev.payload.next_contact_name != null && (
+                <>
+                  {" "}
+                  (next: <span className="font-medium">{ev.payload.next_contact_name}</span>
+                  {ev.payload.next_contact_phone != null && (
+                    <span className="font-mono text-muted-foreground">
+                      {" "}
+                      · {String(ev.payload.next_contact_phone)}
+                    </span>
+                  )}
+                  ).
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (ev.type === "phone_attempt") {
+    return (
+      <div className="p-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-warning/30 bg-warning/10">
+            <Phone className="h-5 w-5 text-warning" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="text-sm font-medium">{title}</div>
+            <p className="text-xs text-muted-foreground">
+              {ev.payload.contact_name != null && (
+                <>
+                  <span className="font-medium text-foreground">{String(ev.payload.contact_name)}</span>
+                  {" · "}
+                </>
+              )}
+              <span className="font-mono">{String(ev.payload.contact_phone ?? "")}</span>
+            </p>
+            {ev.payload.error != null && (
+              <p className="text-sm text-muted-foreground">{String(ev.payload.error)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (ev.type === "browser_failure") {
     return (
@@ -228,6 +311,14 @@ function EvidenceBlock({ ev }: { ev: ActionEvidence }) {
               {" · "}
               <span className="font-mono">{ev.payload.contact_phone}</span>
             </div>
+            {ev.payload.confirmation_number != null && String(ev.payload.confirmation_number).trim() !== "" && (
+              <div className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Confirmation number </span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {ev.payload.confirmation_number}
+                </span>
+              </div>
+            )}
             {transcript.length > 0 ? (
               <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
                 {transcript.map((turn, i) => (
@@ -435,6 +526,7 @@ export default function ActionStatusPage() {
   const { action, isLoading, error } = useAction(id);
   const queryClient = useQueryClient();
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   if (isLoading) {
     return <AppLoading message="Loading action…" />;
@@ -464,6 +556,16 @@ export default function ActionStatusPage() {
       queryClient.invalidateQueries({ queryKey: ["action", id] });
     } finally {
       setIsRetrying(false);
+    }
+  }
+
+  async function handleCancel() {
+    setIsCancelling(true);
+    try {
+      await cancelAction(id);
+      queryClient.invalidateQueries({ queryKey: ["action", id] });
+    } finally {
+      setIsCancelling(false);
     }
   }
 
@@ -535,6 +637,27 @@ export default function ActionStatusPage() {
               channel={action.channel}
             />
 
+            {action.status === "executing" && (
+              <div className="border-b border-border px-6 py-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 sm:w-auto"
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  Stop and mark failed
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Use this if the call is stuck (e.g. no answer) and you want to stop or try again later.
+                </p>
+              </div>
+            )}
 
             <div className="border-b border-border p-6">
               <div className="mb-4 text-sm font-medium text-muted-foreground">

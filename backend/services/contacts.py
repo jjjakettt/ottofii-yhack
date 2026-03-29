@@ -9,7 +9,7 @@ automation and go straight to phone (used for demo purposes).
 """
 
 # Merchants that skip Playwright and trigger the phone call fallback
-PHONE_FALLBACK_MERCHANTS: set[str] = {"heroku"}
+PHONE_FALLBACK_MERCHANTS: set[str] = {"notion"}
 
 # Demo account holder details passed to Jamie as dynamic variables
 DEMO_ACCOUNT = {
@@ -17,18 +17,34 @@ DEMO_ACCOUNT = {
     "phone": "+15551230000",
 }
 
+# Shared demo roster (same numbers as the former Heroku-only list)
+_SHARED_PHONE_CONTACTS: list[dict] = [
+    {"name": "Jake Tran",         "phone": "+16462208361"},
+    {"name": "Dickson Alexander", "phone": "+16032768643"},
+    {"name": "Kasuti Makau",      "phone": "+16033490400"},
+    {"name": "Lynn Lin",          "phone": "+15162348262"},
+]
+
 # Vendor → ordered list of contacts to try (index 0 = primary)
 VENDOR_CONTACTS: dict[str, list[dict]] = {
-    "heroku": [
-        {"name": "Kasuti Makau",      "phone": "+16033490400"},
-        {"name": "Dickson Alexander", "phone": "+16032768643"},
-        {"name": "Jake Tran",         "phone": "+16462208361"},
-       
-        {"name": "Lynn Lin",          "phone": "+15162348262"},
-    ],
+    "notion": _SHARED_PHONE_CONTACTS,
+    "heroku": _SHARED_PHONE_CONTACTS,
+}
+
+# Extra labels that sometimes appear on streams / LLM output instead of display names
+_MERCHANT_ALIASES: dict[str, str] = {
+    "notion.so": "notion",
+    "notion labs": "notion",
+    "heroku inc": "heroku",
 }
 
 
 def get_contacts(merchant: str) -> list[dict]:
     """Return ordered contact list for a merchant, or [] if none configured."""
-    return VENDOR_CONTACTS.get(merchant.lower(), [])
+    key = merchant.strip().casefold()
+    if key in VENDOR_CONTACTS:
+        return VENDOR_CONTACTS[key]
+    resolved = _MERCHANT_ALIASES.get(key)
+    if resolved and resolved in VENDOR_CONTACTS:
+        return VENDOR_CONTACTS[resolved]
+    return []

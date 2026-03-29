@@ -10,12 +10,20 @@ import os
 
 import httpx
 
+from config import ELEVENLABS_POLL_INTERVAL_S, ELEVENLABS_POLL_TIMEOUT_S
+from services.execution_control import is_cancelled
+
 logger = logging.getLogger(__name__)
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 ELEVENLABS_AGENT_ID = os.getenv("ELEVENLABS_AGENT_ID", "")
 ELEVENLABS_PHONE_NUMBER_ID = os.getenv("ELEVENLABS_PHONE_NUMBER_ID", "")
 _BASE = "https://api.elevenlabs.io/v1"
+
+
+def normalize_conv_status(raw: str | None) -> str:
+    """ElevenLabs may return e.g. in-progress or in_progress — normalize for comparisons."""
+    return (raw or "").strip().lower().replace("-", "_")
 
 
 async def initiate_call(
@@ -58,7 +66,7 @@ async def initiate_call(
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{_BASE}/convai/conversations/outbound_call",
+            f"{_BASE}/convai/twilio/outbound-call",
             headers={"xi-api-key": ELEVENLABS_API_KEY},
             json=payload,
             timeout=30.0,
@@ -86,23 +94,41 @@ async def initiate_call(
 
 async def poll_call_until_done(
     conversation_id: str,
-    poll_interval_s: float = 5.0,
-    timeout_s: float = 300.0,
+    poll_interval_s: float | None = None,
+    timeout_s: float | None = None,
+    action_id: str | None = None,
 ) -> dict:
     """
-    Poll the conversation until status == 'done' or timeout is reached.
-    Returns the full conversation data dict.
-    Raises RuntimeError on timeout or API failure.
+    Poll until the conversation reaches a terminal state (done or failed) or timeout.
+
+    Default interval comes from ELEVENLABS_POLL_INTERVAL_S (2s): faster than a 5s
+    loop so the backend finishes soon after ElevenLabs marks the conversation done.
+    Ring/connect/agent audio time is still dominated by Twilio + ElevenLabs.
+
+    Unanswered or dropped calls often move to status 'failed' instead of staying
+    'in-progress' until a long timeout — we exit as soon as we see 'failed'.
+
+    If action_id is set, checks execution cancellation each poll so the user can
+    abort a stuck call from the UI.
+
+    Raises RuntimeError on timeout, API failure, or user cancellation.
     """
+    if poll_interval_s is None:
+        poll_interval_s = ELEVENLABS_POLL_INTERVAL_S
+    if timeout_s is None:
+        timeout_s = ELEVENLABS_POLL_TIMEOUT_S
     elapsed = 0.0
     logger.info("[ElevenLabs] Polling conversation_id=%s (timeout=%ss)", conversation_id, timeout_s)
 
     async with httpx.AsyncClient() as client:
         while elapsed < timeout_s:
+            if action_id and is_cancelled(action_id):
+                raise RuntimeError("Execution cancelled")
+
             resp = await client.get(
                 f"{_BASE}/convai/conversations/{conversation_id}",
                 headers={"xi-api-key": ELEVENLABS_API_KEY},
-                timeout=15.0,
+                timeout=10.0,
             )
 
             try:
@@ -113,12 +139,17 @@ async def poll_call_until_done(
                 ) from e
 
             data = resp.json()
-            status = data.get("status", "unknown")
-            logger.info("[ElevenLabs] Poll at %.0fs → status=%s", elapsed, status)
+            raw_status = data.get("status", "unknown")
+            status = normalize_conv_status(raw_status)
+            logger.info("[ElevenLabs] Poll at %.0fs → status=%s", elapsed, raw_status)
 
             if status == "done":
                 transcript = data.get("transcript", [])
                 logger.info("[ElevenLabs] Call done ✓ transcript_turns=%d", len(transcript))
+                return data
+
+            if status == "failed":
+                logger.info("[ElevenLabs] Conversation ended as failed (e.g. no answer)")
                 return data
 
             await asyncio.sleep(poll_interval_s)

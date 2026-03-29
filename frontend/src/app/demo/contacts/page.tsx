@@ -4,12 +4,12 @@ import { Phone, User } from "lucide-react";
 
 const VENDOR_CONTACTS = [
   {
-    vendor: "Heroku",
-    plan: "Staging — $340/mo",
+    vendor: "Notion",
+    plan: "Team — $320/mo",
     contacts: [
+      { name: "Jake Tran",         phone: "+1 (646) 220-8361", role: "Primary" },
+      { name: "Kasuti Makau",      phone: "+1 (603) 349-0400", role: "Secondary" },
       { name: "Dickson Alexander", phone: "+1 (603) 276-8643", role: "Escalation" },
-      { name: "Jake Tran",         phone: "+1 (646) 220-8361", role: "Secondary" },
-      { name: "Kasuti Makau",      phone: "+1 (603) 349-0400", role: "Primary" },
       { name: "Lynn Lin",          phone: "+1 (516) 234-8262", role: "Escalation" },
     ],
   },
@@ -84,7 +84,7 @@ export default function DemoContacts() {
         ))}
 
         <p className="text-center text-xs text-gray-400">
-          Jamie will call contacts in order. Retry logic (secondary → escalation) coming soon.
+          Jamie will call contacts in order; the next number is tried if the prior attempt does not complete.
         </p>
       </main>
     </div>
