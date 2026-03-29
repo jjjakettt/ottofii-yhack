@@ -1,7 +1,7 @@
 """
 ElevenLabs Conversational AI client for outbound phone calls.
 
-Initiates a call via the Jamie agent and polls until the conversation completes.
+Initiates a call via the configured voice agent (e.g. Otto) and polls until the conversation completes.
 """
 
 import asyncio

@@ -282,6 +282,10 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
                         "transcript": transcript,
                         "transcript_text": transcript_text,
                         "confirmation_number": confirmation_number,
+                        "account_holder": DEMO_ACCOUNT["full_name"],
+                        "account_phone": DEMO_ACCOUNT["phone"],
+                        "subscription_merchant": merchant,
+                        "voice_agent_name": "Otto",
                     },
                 ))
 

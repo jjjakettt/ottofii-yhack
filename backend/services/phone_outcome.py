@@ -1,7 +1,7 @@
 """
 Heuristics for whether a phone call transcript indicates the subscription was cancelled.
 
-Jamie is instructed to obtain a confirmation number before ending (see docs/JAMIE_AGENT_PROMPT.md).
+Otto is instructed to obtain a confirmation number before ending (see docs/JAMIE_AGENT_PROMPT.md).
 If we can extract that number from the transcript, we treat the attempt as successful.
 """
 
@@ -77,7 +77,7 @@ def cancellation_confirmed_in_transcript(transcript: list[dict]) -> bool:
 
     text = transcript_text(transcript).lower()
 
-    # Strong signal: rep provided a confirmation / reference number Jamie asked for
+    # Strong signal: rep provided a confirmation / reference number Otto asked for
     if extract_confirmation_number_from_transcript(transcript) is not None:
         return True
 

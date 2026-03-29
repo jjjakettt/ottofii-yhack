@@ -25,6 +25,11 @@ import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
 import { useQueryClient } from "@tanstack/react-query";
 import { cancelAction, retryAction } from "@/apis/agent";
+import {
+  formatPhoneForDisplay,
+  stripEmotionTags,
+  VOICE_AGENT_NAME,
+} from "@/lib/call-transcript";
 import { formatEvidencePrimaryLine, getScreenshotDataUrl } from "@/lib/evidence-display";
 import { cn } from "@/lib/utils";
 import type { ActionEvidence, ActionStatus as ActionStatusType, ActionType } from "@/types";
@@ -39,8 +44,8 @@ function agentStepMessages(
   if (channel === "phone") {
     return [
       `Browser automation unavailable for ${m}…`,
-      "Initiating phone call via Jamie…",
-      "Jamie connected — requesting cancellation…",
+      "Initiating phone call via Otto…",
+      "Otto connected — requesting cancellation…",
       "Declining retention offers…",
       "Awaiting confirmation number…",
     ];
@@ -185,7 +190,7 @@ function EvidenceBlock({ ev }: { ev: ActionEvidence }) {
     confirmation_id: "Confirmation ID",
     email: "Email",
     screenshot: "Screenshot",
-    call_transcript: "Call Transcript",
+    call_transcript: "Phone cancellation",
     browser_failure: "Browser Automation Failed",
     execution_cancelled: "Execution Stopped",
     phone_attempt: "Phone Attempt",
@@ -297,53 +302,130 @@ function EvidenceBlock({ ev }: { ev: ActionEvidence }) {
   if (ev.type === "call_transcript") {
     const transcript: Array<{ role: string; message: string }> =
       ev.payload.transcript ?? [];
+    const agentName = ev.payload.voice_agent_name ?? VOICE_AGENT_NAME;
+    const accountHolder = ev.payload.account_holder;
+    const accountPhone = ev.payload.account_phone;
+    const merchant = ev.payload.subscription_merchant;
+
     return (
-      <div className="p-4">
-        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-primary/30 bg-primary/10">
-            <Phone className="h-5 w-5 text-primary" />
+      <div className="p-4 sm:p-5">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="border-b border-border bg-muted/50 px-4 py-3 sm:px-5">
+            <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              {agentName} is the voice agent on this call.
+            </p>
           </div>
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="text-sm font-medium">{title}</div>
-            <div className="text-xs text-muted-foreground">
-              Called{" "}
-              <span className="font-medium text-foreground">{ev.payload.contact_name}</span>
-              {" · "}
-              <span className="font-mono">{ev.payload.contact_phone}</span>
+
+          {(accountHolder != null || accountPhone != null || merchant != null) && (
+            <div className="grid gap-3 border-b border-border px-4 py-3 sm:grid-cols-3 sm:px-5">
+              {accountHolder != null && (
+                <div className="space-y-0.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Account holder
+                  </div>
+                  <div className="text-sm font-medium text-foreground">{accountHolder}</div>
+                </div>
+              )}
+              {accountPhone != null && (
+                <div className="space-y-0.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Phone on file
+                  </div>
+                  <div className="font-mono text-sm text-foreground">{formatPhoneForDisplay(accountPhone)}</div>
+                </div>
+              )}
+              {merchant != null && (
+                <div className="space-y-0.5">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Subscription
+                  </div>
+                  <div className="text-sm font-medium text-foreground">{merchant}</div>
+                </div>
+              )}
             </div>
-            {ev.payload.confirmation_number != null && String(ev.payload.confirmation_number).trim() !== "" && (
-              <div className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Confirmation number </span>
-                <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {ev.payload.confirmation_number}
-                </span>
+          )}
+
+          <div className="border-b border-border px-4 py-3 sm:px-5">
+            <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Vendor line
+            </div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+              <span className="font-medium text-foreground">{ev.payload.contact_name}</span>
+              <span className="font-mono text-muted-foreground">{ev.payload.contact_phone}</span>
+            </div>
+          </div>
+
+          {ev.payload.confirmation_number != null && String(ev.payload.confirmation_number).trim() !== "" && (
+            <div className="border-b border-border px-4 py-3 sm:px-5">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
+                <FileCheck className="h-4 w-4 shrink-0 text-success" />
+                <div>
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Confirmation number
+                  </div>
+                  <div className="font-mono text-base font-semibold tabular-nums text-foreground">
+                    {ev.payload.confirmation_number}
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
+          )}
+
+          <div className="bg-muted/20 px-3 py-4 sm:px-4">
+            <div className="mb-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Conversation
+            </div>
             {transcript.length > 0 ? (
-              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
-                {transcript.map((turn, i) => (
-                  <div key={i} className={cn("flex gap-2 text-sm", turn.role === "agent" ? "justify-start" : "justify-end")}>
+              <div className="space-y-3">
+                {transcript.map((turn, i) => {
+                  const isAgent = turn.role === "agent";
+                  const body = stripEmotionTags(String(turn.message ?? ""));
+                  const label = isAgent ? agentName : "Support";
+                  const initial = isAgent ? agentName.charAt(0) : "S";
+                  return (
                     <div
+                      key={i}
                       className={cn(
-                        "max-w-[80%] rounded-lg px-3 py-2",
-                        turn.role === "agent"
-                          ? "bg-primary/10 text-foreground"
-                          : "bg-muted text-foreground"
+                        "flex gap-3",
+                        isAgent ? "flex-row" : "flex-row-reverse",
                       )}
                     >
-                      <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {turn.role === "agent" ? "Jamie" : "Support Rep"}
-                      </span>
-                      {turn.message}
+                      <div
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                          isAgent
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground",
+                        )}
+                        aria-hidden
+                      >
+                        {initial}
+                      </div>
+                      <div
+                        className={cn(
+                          "max-w-[min(100%,28rem)] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                          isAgent
+                            ? "rounded-tl-sm border border-primary/20 bg-primary/10 text-foreground"
+                            : "rounded-tr-sm border border-border bg-background text-foreground",
+                        )}
+                      >
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {label}
+                        </div>
+                        <p className="whitespace-pre-wrap break-words">{body}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : ev.payload.transcript_text ? (
-              <pre className="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/30 p-3 font-sans text-sm text-foreground">
-                {ev.payload.transcript_text}
+              <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-background p-4 font-sans text-sm text-foreground">
+                {stripEmotionTags(ev.payload.transcript_text)}
               </pre>
-            ) : null}
+            ) : (
+              <p className="text-sm text-muted-foreground">No transcript lines returned.</p>
+            )}
           </div>
         </div>
       </div>

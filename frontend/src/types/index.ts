@@ -106,6 +106,10 @@ export type ActionEvidence =
         contact_name?: string;
         contact_phone?: string;
         confirmation_number?: string | null;
+        account_holder?: string;
+        account_phone?: string;
+        subscription_merchant?: string;
+        voice_agent_name?: string;
       };
     }
   | {

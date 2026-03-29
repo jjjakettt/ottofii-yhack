@@ -25,7 +25,7 @@ export default function DemoContacts() {
           </p>
           <h1 className="text-xl font-bold text-gray-900">Cancellation Contacts</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Support contacts Jamie will call when browser automation is unavailable.
+            Support contacts Otto will call when browser automation is unavailable.
           </p>
         </div>
       </header>
@@ -84,7 +84,7 @@ export default function DemoContacts() {
         ))}
 
         <p className="text-center text-xs text-gray-400">
-          Jamie will call contacts in order; the next number is tried if the prior attempt does not complete.
+          Otto will call contacts in order; the next number is tried if the prior attempt does not complete.
         </p>
       </main>
     </div>

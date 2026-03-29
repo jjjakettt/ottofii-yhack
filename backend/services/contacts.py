@@ -11,7 +11,7 @@ automation and go straight to phone (used for demo purposes).
 # Merchants that skip Playwright and trigger the phone call fallback
 PHONE_FALLBACK_MERCHANTS: set[str] = {"notion"}
 
-# Demo account holder details passed to Jamie as dynamic variables
+# Demo account holder details passed to ElevenLabs as {{full_name}} / {{phone_number}}
 DEMO_ACCOUNT = {
     "full_name": "Acme Corp",
     "phone": "+15551230000",
