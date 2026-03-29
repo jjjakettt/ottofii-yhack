@@ -1,15 +1,11 @@
-import { API_BASE_URL } from "@/config/api";
 import type { ConnectResponse, Source } from "@/types";
 
 // POST /connect/mock
 export async function connectSource(source: Source): Promise<ConnectResponse> {
-  const res = await fetch(`${API_BASE_URL}/connect/mock`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source }),
-  });
-  if (!res.ok) throw new Error(`connectSource failed: ${res.status}`);
-  return res.json();
+  return {
+    connection_id: `conn_mock_${source}`,
+    streams_loaded: source === "demo" ? 12 : 4,
+  };
 }
 
 export async function connectSources(sources: Source[]): Promise<ConnectResponse> {
