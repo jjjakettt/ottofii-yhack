@@ -5,7 +5,7 @@
 
 /* Ottofii - Enterprise theme with violet accent */
 :root {
-  --background: oklch(0.98 0 0);
+  --background: oklch(0.985 0.002 90); /* slightly warm off-white */
   --foreground: oklch(0.15 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.15 0 0);
@@ -82,6 +82,7 @@
 @theme inline {
   --font-sans: "Inter", "Inter Fallback", sans-serif;
   --font-mono: "JetBrains Mono", "JetBrains Mono Fallback", monospace;
+  --font-serif: var(--font-playfair), "Georgia", serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -136,4 +137,28 @@
 /* Tabular numerals for financial figures */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Serif display headings for landing page */
+.font-display {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+}
+
+/* Grain texture overlay for landing sections */
+.grain {
+  position: relative;
+}
+.grain::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px;
+  opacity: 0.5;
+  z-index: 0;
 }
