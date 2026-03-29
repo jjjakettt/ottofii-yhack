@@ -152,6 +152,12 @@ export interface ConfirmResponse {
   action_id: string;
 }
 
+// Reject Response
+export interface RejectResponse {
+  recommendation_id: string;
+  status: string;
+}
+
 // Execute Response
 export interface ExecuteResponse {
   action_id: string;

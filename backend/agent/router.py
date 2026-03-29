@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import ActionPlan as ActionPlanModel, Recommendation, Action
 from agent.planner import build_plan
-from schemas import ActionPlan, ConfirmRequest, ConfirmResponse
+from schemas import ActionPlan, ConfirmRequest, ConfirmResponse, RejectRequest, RejectResponse
 
 router = APIRouter()
 
@@ -125,3 +125,21 @@ def agent_confirm(req: ConfirmRequest, db: Session = Depends(get_db)):
     db.commit()
 
     return ConfirmResponse(action_id=action_id)
+
+
+@router.post("/reject", response_model=RejectResponse)
+def agent_reject(req: RejectRequest, db: Session = Depends(get_db)):
+    rec = db.query(Recommendation).filter(
+        Recommendation.id == req.recommendation_id
+    ).first()
+
+    if not rec:
+        raise HTTPException(status_code=404, detail="recommendation_id not found")
+
+    if rec.status != "pending":
+        raise HTTPException(status_code=409, detail=f"Recommendation is already {rec.status}")
+
+    rec.status = "rejected"
+    db.commit()
+
+    return RejectResponse(recommendation_id=req.recommendation_id, status="rejected")

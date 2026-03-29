@@ -150,6 +150,16 @@ class ConfirmResponse(BaseModel):
     action_id: str
 
 
+class RejectRequest(BaseModel):
+    recommendation_id: str
+    rejected_by: str
+
+
+class RejectResponse(BaseModel):
+    recommendation_id: str
+    status: str
+
+
 # ─────────────────────────────────────────────
 # LAYER 4 OUTPUT (Person 4 produces)
 # ─────────────────────────────────────────────

@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
 import { AppLoading } from "@/components/app-loading";
 import { useAction } from "@/hooks/useAction";
-import { useExecuteAction } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
 import type { ActionStatus as ActionStatusType, ActionType } from "@/types";
 
@@ -290,8 +289,6 @@ export default function ActionStatusPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
   const { action, isLoading, error } = useAction(id);
-  const execute = useExecuteAction(id);
-
   if (isLoading) {
     return <AppLoading message="Loading action…" />;
   }
@@ -380,21 +377,6 @@ export default function ActionStatusPage() {
               merchant={action.merchant}
             />
 
-            {action.status === "approved" && (
-              <div className="border-b border-border p-6">
-                <Button
-                  type="button"
-                  onClick={() => execute.mutate()}
-                  disabled={execute.isPending}
-                  className="gap-2"
-                >
-                  {execute.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : null}
-                  Execute action
-                </Button>
-              </div>
-            )}
 
             <div className="border-b border-border p-6">
               <div className="mb-4 text-sm font-medium text-muted-foreground">
