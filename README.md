@@ -30,6 +30,50 @@ The problem isn't awareness. It's execution. Canceling subscriptions requires lo
 
 ## Demo Walkthrough
 
+### Landing Page
+
+![Landing page — hero](frontend/screenshots/landing_page_1.png)
+*Hero: "The SaaS cleanup you've been putting off for months." — $48/employee/month average waste. One-click to start.*
+
+![Landing page — before vs. after](frontend/screenshots/landing_page_2.png)
+*Before vs. After: Finding subscriptions manually vs. Ottofii scanning bank, Gmail, and ERP automatically. Cancelling via 15-step hold music vs. Ottofii navigating the flow or calling support.*
+
+![Landing page — features](frontend/screenshots/landing_page_3.png)
+*Live agent activity log, "finds what you forgot" data connectors, and ranks by actual impact — usage signals, seat counts, and regret-risk.*
+
+---
+
+### Onboarding (8 steps)
+
+![Onboarding step 1 — welcome](frontend/screenshots/onboarding_1.png)
+*Step 1: Welcome screen — outlines the three-step process: connect data sources, review AI recommendations, approve or let Ottofii execute.*
+
+![Onboarding step 2 — company info](frontend/screenshots/onboarding_2.png)
+*Step 2: Company profile — name, industry, and size so Ottofii can tailor recommendations to your scale.*
+
+![Onboarding step 3 — create account](frontend/screenshots/onboarding_3.png)
+*Step 3: Account creation — name and work email. Any values work for the demo.*
+
+![Onboarding step 4 — connect data sources (OAuth)](frontend/screenshots/onboarding_4.png)
+*Step 4: Connect data sources — Gmail, Slack, Bank/Cards, CSV upload, or QuickBooks. OAuth permission prompt shown for Gmail.*
+
+![Onboarding step 4 — data sources connected](frontend/screenshots/onboarding_5.png)
+*Step 4 (continued): Gmail and Bank/Cards connected. At least one source required; more can be added later.*
+
+![Onboarding step 5 — analysis complete](frontend/screenshots/onboarding_6.png)
+*Step 5: Analysis complete — Ottofii found 13 recurring subscriptions across connected sources.*
+
+![Onboarding step 6 — goals](frontend/screenshots/onboarding_7.png)
+*Step 6: Goals selection — Reduce SaaS spend, Eliminate unused tools, Renegotiate contracts, Consolidate vendors. Ottofii prioritizes recommendations accordingly.*
+
+![Onboarding step 7 — agent mode](frontend/screenshots/onboarding_8.png)
+*Step 7: Agent mode — Safe mode (you approve every action) vs. Autonomous mode (Ottofii executes within policy, you review the audit log). Legal contracts, payroll, and tax obligations are always protected.*
+
+![Onboarding step 8 — all set](frontend/screenshots/onboarding_9.png)
+*Step 8: Setup complete — company, sources connected, goals, and agent mode confirmed. Ready to view the dashboard.*
+
+---
+
 ### 1. Spend Dashboard
 
 The dashboard gives a real-time view of all detected subscriptions, their billing cadence, seat count, usage levels, and Otto's confidence in each detection.
