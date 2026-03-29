@@ -80,7 +80,7 @@ class Recommendation(Base):
     regret_risk = Column(String)    # 'low' | 'medium' | 'high'
     explanation = Column(Text)
     evidence = Column(JSON)
-    status = Column(String, default="pending")  # 'pending' | 'approved' | 'rejected' | 'deferred'
+    status = Column(String, default="pending")  # 'pending' | 'approved' | 'rejected' | 'deferred' | 'completed'
     plan_id = Column(String, ForeignKey("action_plans.id"))
     created_at = Column(TIMESTAMP, server_default=func.now())
 

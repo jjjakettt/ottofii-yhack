@@ -1,10 +1,23 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getActionPlan, confirmAction, executeAction } from "@/apis/agent";
-import { MOCK_EXECUTION_SUCCESS_MS } from "@/lib/action-execution-mock";
-import { planKey, actionKey, savingsSummaryKey } from "./keys";
-import type { ActionPlan } from "@/types";
+import { getActionPlan, confirmAction, executeAction, getRecommendations } from "@/apis/agent";
+import { planKey, actionKey, savingsSummaryKey, recommendationsKey } from "./keys";
+import type { ActionPlan, RecommendationsResponse } from "@/types";
+
+export const useRecommendations = (status = "pending") => {
+  const query = useQuery<RecommendationsResponse>({
+    queryKey: recommendationsKey(status),
+    queryFn: () => getRecommendations(status),
+  });
+
+  return {
+    ...query,
+    recommendations: query.data?.recommendations ?? [],
+    totalMonthlySavings: query.data?.total_monthly_savings_usd ?? 0,
+    totalAnnualSavings: query.data?.total_annual_savings_usd ?? 0,
+  };
+};
 
 export const usePlan = (userGoal?: string) => {
   const query = useQuery<ActionPlan>({
@@ -18,6 +31,17 @@ export const usePlan = (userGoal?: string) => {
   };
 };
 
+export const useGeneratePlan = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userGoal = "Reduce my monthly spend") => getActionPlan(userGoal),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: recommendationsKey("pending") });
+    },
+  });
+};
+
 export const useConfirmAction = () => {
   const queryClient = useQueryClient();
 
@@ -25,7 +49,6 @@ export const useConfirmAction = () => {
     mutationFn: ({ recommendationId, approvedBy }: { recommendationId: string; approvedBy?: string }) =>
       confirmAction(recommendationId, approvedBy),
     onSuccess: async ({ action_id }) => {
-      // pre-populate the action cache so /actions/[id] loads immediately
       await queryClient.invalidateQueries({ queryKey: actionKey(action_id) });
     },
   });
@@ -37,12 +60,10 @@ export const useExecuteAction = (actionId: string) => {
   return useMutation({
     mutationFn: () => executeAction(actionId),
     onSuccess: async () => {
+      // useAction already polls every 3s while status === "executing"
+      // Just invalidate once to trigger the first poll immediately
       await queryClient.invalidateQueries({ queryKey: actionKey(actionId) });
-      // Mock run completes asynchronously; refetch when overlay flips to succeeded.
-      window.setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: actionKey(actionId) });
-        void queryClient.invalidateQueries({ queryKey: savingsSummaryKey() });
-      }, MOCK_EXECUTION_SUCCESS_MS + 150);
+      await queryClient.invalidateQueries({ queryKey: savingsSummaryKey() });
     },
   });
 };

@@ -32,21 +32,38 @@ async def agent_plan(req: PlanRequest, db: Session = Depends(get_db)):
     db.add(db_plan)
 
     for action in plan.actions:
-        db_rec = Recommendation(
-            id=action.recommendation_id,
-            org_id=ORG_ID,
-            stream_id=action.stream_id,
-            action_type=action.action_type,
-            savings_usd=action.monthly_savings_usd,
-            savings_annual=action.annual_savings_usd,
-            confidence=action.confidence,
-            regret_risk=action.regret_risk,
-            explanation=action.explanation,
-            evidence=action.evidence.model_dump(),
-            status="pending",
-            plan_id=plan.plan_id,
-        )
-        db.add(db_rec)
+        # Upsert: if a pending recommendation already exists for this stream, update it in place
+        existing_rec = db.query(Recommendation).filter(
+            Recommendation.org_id == ORG_ID,
+            Recommendation.stream_id == action.stream_id,
+            Recommendation.status == "pending",
+        ).first()
+
+        if existing_rec:
+            existing_rec.action_type = action.action_type
+            existing_rec.savings_usd = action.monthly_savings_usd
+            existing_rec.savings_annual = action.annual_savings_usd
+            existing_rec.confidence = action.confidence
+            existing_rec.regret_risk = action.regret_risk
+            existing_rec.explanation = action.explanation
+            existing_rec.evidence = action.evidence.model_dump()
+            existing_rec.plan_id = plan.plan_id
+        else:
+            db_rec = Recommendation(
+                id=action.recommendation_id,
+                org_id=ORG_ID,
+                stream_id=action.stream_id,
+                action_type=action.action_type,
+                savings_usd=action.monthly_savings_usd,
+                savings_annual=action.annual_savings_usd,
+                confidence=action.confidence,
+                regret_risk=action.regret_risk,
+                explanation=action.explanation,
+                evidence=action.evidence.model_dump(),
+                status="pending",
+                plan_id=plan.plan_id,
+            )
+            db.add(db_rec)
 
     db.commit()
     return plan
