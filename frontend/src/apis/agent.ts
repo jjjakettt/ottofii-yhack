@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/config/api";
-import type { ActionPlan, ConfirmResponse, ExecuteResponse } from "@/types";
+import type { ActionPlan, ConfirmResponse, ExecuteResponse, RecommendationsResponse } from "@/types";
 
 // POST /agent/plan
 export async function getActionPlan(userGoal = "Reduce my monthly spend"): Promise<ActionPlan> {
@@ -23,6 +23,13 @@ export async function confirmAction(
     body: JSON.stringify({ recommendation_id: recommendationId, approved_by: approvedBy }),
   });
   if (!res.ok) throw new Error(`confirmAction failed: ${res.status}`);
+  return res.json();
+}
+
+// GET /recommendations?status=pending|completed|all
+export async function getRecommendations(status = "pending"): Promise<RecommendationsResponse> {
+  const res = await fetch(`${API_BASE_URL}/recommendations?status=${status}`);
+  if (!res.ok) throw new Error(`getRecommendations failed: ${res.status}`);
   return res.json();
 }
 

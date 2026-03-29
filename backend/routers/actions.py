@@ -86,6 +86,13 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
             action.status = "succeeded"
             action.executed_at = _now()
 
+            # Mark the recommendation as completed so frontend filters it out
+            rec = db.query(Recommendation).filter(
+                Recommendation.id == action.recommendation_id
+            ).first()
+            if rec:
+                rec.status = "completed"
+
             _write_audit(db, "action.succeeded", "action", action_id, {
                 "merchant": merchant,
                 "confirmation_id": result["confirmation_id"],
