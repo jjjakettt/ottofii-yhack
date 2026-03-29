@@ -9,27 +9,45 @@ from __future__ import annotations
 
 import re
 
+_WORD_TO_DIGIT = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+}
+
+
+def normalize_confirmation_number(raw: str) -> str:
+    """
+    Convert a spoken confirmation number to its compact alphanumeric form.
+    e.g. "six B X Y two Z" → "6BXY2Z"
+    """
+    tokens = raw.strip().split()
+    result = []
+    for token in tokens:
+        clean = token.strip(".,;:()")
+        lower = clean.lower()
+        if lower in _WORD_TO_DIGIT:
+            result.append(_WORD_TO_DIGIT[lower])
+        elif re.fullmatch(r"[A-Za-z0-9\-]+", clean):
+            result.append(clean.upper())
+        # skip anything else (articles, punctuation fragments)
+    return "".join(result)
+
 # Rep may say "confirmation number is X", "your reference is X", etc.
 _CONFIRMATION_NUMBER_PATTERNS: tuple[re.Pattern[str], ...] = (
-    # Explicit "number is …" avoids capturing the word "number" as the ID
+    # "confirmation number (is|for|of|…) XYZ" — absorbs prepositions before the ID
     re.compile(
-        r"\b(?:confirmation|reference)\s+number\s+is\s+([A-Z0-9][A-Z0-9\-]{3,})\b",
+        r"\b(?:confirmation|reference|cancellation)\s+(?:number|code|id|#)\s+"
+        r"(?:(?:is|for|of|to|a|the|your|our)\s+)?(\S+)",
         re.IGNORECASE,
     ),
+    # "confirmation: XYZ" or "reference: XYZ"
     re.compile(
-        r"\bconfirmation\s*(?:code|#)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{3,})\b",
+        r"\b(?:confirmation|reference)\s*[:#]\s*(\S+)",
         re.IGNORECASE,
     ),
+    # "ticket/case number: XYZ"
     re.compile(
-        r"\breference\s*(?:#|code)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{3,})\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:ticket|case)\s*(?:#|number)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{3,})\b",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"\b(?:order|cancellation)\s*(?:#|id|number)?\s*[:\s]\s*([A-Z0-9][A-Z0-9\-]{4,})\b",
+        r"\b(?:ticket|case)\s+(?:number|#|id)\s*[:#\s]\s*(\S+)",
         re.IGNORECASE,
     ),
 )
@@ -49,20 +67,20 @@ def extract_confirmation_number_from_transcript(transcript: list[dict]) -> str |
         return None
 
     junk = frozenset(
-        {"number", "code", "here", "the", "your", "this", "that", "is", "are", "was"}
+        {
+            "number", "code", "here", "the", "your", "this", "that", "is", "are", "was",
+            "for", "of", "to", "a", "an", "our", "my", "their", "its", "and", "or",
+            "process", "processed", "complete", "completed", "cancelled", "canceled",
+            "subscription", "account", "request", "cancellation", "done", "call",
+        }
     )
 
     for pat in _CONFIRMATION_NUMBER_PATTERNS:
         m = pat.search(text)
         if m:
-            raw = m.group(1).strip().rstrip(".,;:")
+            raw = m.group(1).strip().strip(".,;:()")
             low = raw.lower()
-            if len(raw) < 4 or low in junk:
-                continue
-            # Prefer IDs that look like references (digit or hyphen) unless very long token
-            if any(c.isdigit() for c in raw) or "-" in raw or len(raw) >= 8:
-                return raw
-            if len(raw) >= 6 and low not in junk:
+            if len(raw) >= 3 and low not in junk:
                 return raw
     return None
 
@@ -89,6 +107,8 @@ def cancellation_confirmed_in_transcript(transcript: list[dict]) -> bool:
         "canceled",
         "cancellation is complete",
         "cancellation has been processed",
+        "processed the cancellation",
+        "processed your cancellation",
         "subscription has been cancelled",
         "subscription has been canceled",
         "order has been cancelled",
@@ -104,10 +124,13 @@ def cancellation_confirmed_in_transcript(transcript: list[dict]) -> bool:
         "membership has been cancelled",
         "i've cancelled",
         "i have cancelled",
-        "processed your cancellation",
         "we've cancelled",
         "we have cancelled",
         "that's confirmed",
         "all set on the cancellation",
+        "gone ahead and cancelled",
+        "gone ahead and canceled",
+        "taken care of the cancellation",
+        "all set for you",
     )
     return any(p in text for p in phrases)

@@ -3,9 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Zap } from "lucide-react";
-import { DEMO_BUSINESS_NAME } from "@/lib/demo-account";
-import { cn } from "@/lib/utils";
+import {
+  DEMO_BUSINESS_NAME,
+  DEMO_ORG_ID,
+  DEMO_USER_ID,
+} from "@/lib/demo-account";
+import { cn, initialsFromDisplayName } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
@@ -28,6 +40,7 @@ function isNavActive(pathname: string, href: string) {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const initials = initialsFromDisplayName(DEMO_BUSINESS_NAME);
 
   return (
     <header className="flex h-14 items-center border-b border-border px-6">
@@ -59,7 +72,48 @@ export function AppHeader() {
       </div>
       <div className="ml-auto flex items-center gap-4">
         <ThemeToggle />
-        <span className="text-sm text-muted-foreground">{DEMO_BUSINESS_NAME}</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="ring-offset-background rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="Account menu"
+            >
+              <Avatar className="size-8">
+                <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-64" align="end">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium leading-none">
+                  {DEMO_BUSINESS_NAME}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  Signed in (demo)
+                </span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <div className="text-muted-foreground space-y-2 px-2 py-1.5 text-xs">
+              <div className="flex items-start justify-between gap-3">
+                <span className="shrink-0">Org ID</span>
+                <span className="text-foreground font-mono text-[11px] leading-snug break-all text-right">
+                  {DEMO_ORG_ID}
+                </span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <span className="shrink-0">User ID</span>
+                <span className="text-foreground font-mono text-[11px] leading-snug break-all text-right">
+                  {DEMO_USER_ID}
+                </span>
+              </div>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

@@ -39,6 +39,7 @@ from services.elevenlabs import (
 from services.phone_outcome import (
     cancellation_confirmed_in_transcript,
     extract_confirmation_number_from_transcript,
+    normalize_confirmation_number,
 )
 
 router = APIRouter()
@@ -263,14 +264,25 @@ async def _run_execution(action_id: str, subscription_id: str, merchant: str):
             )
             conv_status = normalize_conv_status(conv_data.get("status"))
             transcript = conv_data.get("transcript") or []
+            analysis = conv_data.get("analysis") or {}
+            data_collection = analysis.get("data_collection_results") or {}
+            conf_entry = data_collection.get("confirmation_number") or {}
+            _raw_confirmation = (
+                conf_entry.get("value")
+                or extract_confirmation_number_from_transcript(transcript)
+            )
+            confirmation_number = normalize_confirmation_number(_raw_confirmation) if _raw_confirmation else None
 
-            confirmed = conv_status == "done" and cancellation_confirmed_in_transcript(transcript)
+            # Trust ElevenLabs' own success evaluation first; fall back to transcript heuristics
+            elevenlabs_success = str(analysis.get("call_successful", "")).lower() == "success"
+            confirmed = conv_status == "done" and (
+                elevenlabs_success or cancellation_confirmed_in_transcript(transcript)
+            )
 
             if confirmed:
                 logger.info("[execution] Cancellation confirmed with %s — done", contact["name"])
 
                 transcript_text = format_transcript(transcript)
-                confirmation_number = extract_confirmation_number_from_transcript(transcript)
                 db.add(ActionEvidence(
                     id=_new_id("evi_"),
                     action_id=action_id,
