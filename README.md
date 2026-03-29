@@ -199,9 +199,32 @@ We split the system into four ownership layers with strict API contracts defined
 
 ## What's Next
 
-- **Real data connectors:** OAuth integrations with Gmail and Plaid to replace mock data with live transactions and email receipts.
-- **Free trial watcher:** Detect trial start dates and auto-cancel before the first charge hits.
-- **Individual tier:** The same engine applied to personal subscriptions.
+> Moving from insight → execution platform. The goal is an autonomous agent for spend optimization, not just a dashboard.
+
+### 1. Data Connectors
+
+- **Live financial integrations** — OAuth with Gmail and Plaid to ingest real transactions and email receipts
+- **Enterprise ingestion** — ERP, invoicing, and accounting system integrations; replace demo data with real workflows
+- **B2B expansion** — Target enterprise SaaS spend (10–100× consumer scale) with signals like team size, revenue, and usage patterns
+
+### 2. Data Analysis & Intelligence
+
+- **Advanced ingestion pipelines** — Structured parsing of transactions, invoices, and subscription signals
+- **Predictive waste detection** — Replace heuristics with real usage signals (e.g., flag inactivity after 30+ days of no logins)
+- **Sharper deterministic pre-scoring** — Cleanly separate deterministic logic (spend, frequency, savings rank) from LLM reasoning (context, recommendations) to reduce hallucinations further
+
+### 3. Agent Actions
+
+- **IntelliNegotiation** — AI-driven contract renegotiation via email or voice agents
+- **Smart downsizing** — Recommend plan downgrades, not just outright cancellations
+- **Free trial watcher** — Detect trial start dates and notify or auto-cancel before the first charge hits
+- **Auto mode (premium)** — Automatically cancel unused subscriptions after a configurable inactivity threshold
+- **Contract renewal management** — Track renewal dates and surface cost-per-use metrics before auto-renewals trigger
+
+### 4. Verification & Reliability
+
+- **Anti-fragile execution** — Hybrid automation (APIs + browser + email flows) resilient to vendor UI and API changes
+- **Full audit trails** — Logs, confirmation IDs, and screenshots for every action taken
 
 ---
 
@@ -218,6 +241,17 @@ We split the system into four ownership layers with strict API contracts defined
 | Voice Agent | ElevenLabs Conversational AI + Twilio |
 
 **Built with:** `python` `next.js` `supabase` `sqlalchemy` `typescript` `react` `fastapi` `postgresql` `openai` `gemini` `elevenlabs` `twilio` `playwright`
+
+---
+
+## Contributors
+
+| | Name | School | GitHub |
+|---|------|--------|--------|
+| | **Kasuti Makau** | Dartmouth College | [@EKasuti](https://github.com/EKasuti) |
+| | **Dickson Alexander** | Dartmouth College | [@Dickson-Alexander](https://github.com/Dickson-Alexander) |
+| | **Jake Tran** | Brown University | [@jjjakettt](https://github.com/jjjakettt) |
+| | **Lynn Lin** | Brown University | [@lynnlin77](https://github.com/lynnlin77) |
 
 ---
 
