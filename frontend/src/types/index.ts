@@ -117,6 +117,30 @@ export interface SavingsSummary {
   actions_failed: number;
 }
 
+// Recommendation Item (from GET /recommendations)
+export type RecommendationStatus = "pending" | "approved" | "rejected" | "deferred" | "completed";
+
+export interface RecommendationItem {
+  recommendation_id: string;
+  stream_id: string;
+  merchant: string;
+  action_type: ActionType;
+  monthly_savings_usd: number;
+  annual_savings_usd: number;
+  confidence: number;
+  regret_risk: RegretRisk;
+  explanation: string;
+  evidence: Evidence;
+  status: RecommendationStatus;
+  created_at: string;
+}
+
+export interface RecommendationsResponse {
+  recommendations: RecommendationItem[];
+  total_monthly_savings_usd: number;
+  total_annual_savings_usd: number;
+}
+
 // Connect Response
 export interface ConnectResponse {
   connection_id: string;

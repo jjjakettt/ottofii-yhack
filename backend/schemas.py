@@ -194,3 +194,36 @@ class ExecuteResponse(BaseModel):
 
 # Alias — avoids naming collision with ActionEvidence ORM model in routers
 ActionEvidenceSchema = ActionEvidence
+
+
+# ─────────────────────────────────────────────
+# GET /recommendations response
+# ─────────────────────────────────────────────
+
+class RecommendationStatus(str, Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    deferred = "deferred"
+    completed = "completed"
+
+
+class RecommendationItem(BaseModel):
+    recommendation_id: str
+    stream_id: str
+    merchant: str
+    action_type: ActionType
+    monthly_savings_usd: float
+    annual_savings_usd: float
+    confidence: float
+    regret_risk: RegretRisk
+    explanation: str
+    evidence: Evidence
+    status: RecommendationStatus
+    created_at: str
+
+
+class RecommendationsResponse(BaseModel):
+    recommendations: List[RecommendationItem]
+    total_monthly_savings_usd: float
+    total_annual_savings_usd: float

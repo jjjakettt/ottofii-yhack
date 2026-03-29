@@ -33,7 +33,7 @@ const SUBSCRIPTIONS = [
   },
   {
     id: "stream_004",
-    merchant: "Adobe CC",
+    merchant: "Adobe Creative Cloud",
     plan: "All Apps",
     seats: 8,
     amount: 600,
